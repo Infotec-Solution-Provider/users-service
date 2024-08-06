@@ -25,7 +25,7 @@ const UsersService = new BasicCrud<User>({
         "ULTIMO_LOGIN_INI",
         "ULTIMO_LOGIN_FIM",
     ],
-    service: instancesService
+    service: instancesService,
 });
 
 export default UsersService;

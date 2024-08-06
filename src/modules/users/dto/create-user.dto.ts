@@ -116,7 +116,7 @@ export class CreateUserDto implements Partial<User> {
     LIGA_REPRESENTANTE_DIAS: number | null;
 
     @IsEmail()
-    @IsString()
+    @IsOptional()
     EMAILOPERADOR: string | null;
 
     @IsString()
