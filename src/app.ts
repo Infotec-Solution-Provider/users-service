@@ -14,14 +14,14 @@ import AuthController from "./modules/auth/auth.controller";
 const app = express();
 
 const controllers = {
-    users: new UsersController(),
-    shifts: new ShiftsController(),
-    groups: new UserGroupsController(),
-    pauses: new PausesController(),
-    goals: new GoalsController(),
-    sipConfigs: new SipConfigsController(),
-    auth: new AuthController()
-}
+	users: new UsersController(),
+	shifts: new ShiftsController(),
+	groups: new UserGroupsController(),
+	pauses: new PausesController(),
+	goals: new GoalsController(),
+	sipConfigs: new SipConfigsController(),
+	auth: new AuthController(),
+};
 
 const serviceEndpoint = "/api/users-service";
 
@@ -38,10 +38,10 @@ app.use(serviceEndpoint, controllers.auth.router);
 
 app.use(handleRequestError);
 
-Object.values(controllers).forEach(c => {
-    const e = getRouterEndpoints(c.router, serviceEndpoint);
+Object.values(controllers).forEach((c) => {
+	const e = getRouterEndpoints(c.router, serviceEndpoint);
 
-    e.forEach(r => console.log(`[ROUTE] ${r}`));
+	e.forEach((r) => console.log(`[ROUTE] ${r}`));
 });
 
 export default app;
