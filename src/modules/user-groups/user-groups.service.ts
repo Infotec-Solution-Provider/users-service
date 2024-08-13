@@ -2,6 +2,7 @@ import BasicCrud from "inpulse-crm/utils/src/basicCrud.class";
 import { UserGroup, UserGroupMember } from "./types/user-group.type";
 import instancesService from "../../instances.service";
 import { AddUserGroupDto } from "./dto/add-group-user.dto";
+import { BadRequestError, ConflictError, InternalServerError, NotFoundError } from "@rgranatodutra/http-errors";
 
 const UserGroupsService = new BasicCrud<UserGroup>({
 	tableName: "grupos_operador",
@@ -12,14 +13,38 @@ const UserGroupsService = new BasicCrud<UserGroup>({
 	service: instancesService,
 });
 
-const UserGroupsMembersService = {
-	get: async (clientName: string, userGroupId: number) => {
+class UserGroupsMembersService {
+	public static async get(clientName: string, userGroupId: number) {
 		const getMembersQuery = "SELECT * FROM gruposxoperadores WHERE GRUPO = ?";
 		const response = await instancesService.executeQuery<UserGroupMember[]>(clientName, getMembersQuery, [userGroupId]);
 
 		return response.result;
-	},
-	add: async (clientName: string, userGroupId: number, data: AddUserGroupDto) => {
+	}
+
+	private static async getOneById(clientName: string, id: number) {
+		const getMemberQuery = "SELECT * FROM gruposxoperadores WHERE CODIGO = ?";
+		const response = await instancesService.executeQuery<UserGroupMember[]>(clientName, getMemberQuery, [id]);
+
+		const member = response.result[0];
+
+		if (!member) {
+			throw new NotFoundError("group member not found");
+		}
+
+		return member;
+	}
+
+	public static async create(clientName: string, userGroupId: number, data: AddUserGroupDto) {
+		const userAlreadyExists = await instancesService.executeQuery<UserGroupMember[]>(
+			clientName,
+			"SELECT * FROM gruposxoperadores WHERE GRUPO = ? AND OPERADOR = ?",
+			[userGroupId, data.OPERADOR]
+		);
+
+		if (userAlreadyExists.result[0]) {
+			throw new ConflictError("User already exists whitin this group");
+		}
+
 		const lastGroupUser = await instancesService
 			.executeQuery<{ CODIGO: number }[]>(
 				clientName,
@@ -44,8 +69,24 @@ const UserGroupsMembersService = {
 		]);
 
 		return response.result[0];
-	},
-};
+	}
+
+	public static async delete(clientName: string, id: number, userGroupId: number) {
+		const member = await UserGroupsMembersService.getOneById(clientName, id);
+
+		if (member.GRUPO !== userGroupId) {
+			throw new BadRequestError("this user doesn't belong to this group");
+		}
+
+		const deleteMemberQuery = "DELETE FROM gruposxoperadores WHERE CODIGO = ? AND GRUPO = ?";
+		const response = await instancesService.executeQuery<UserGroupMember[]>(clientName, deleteMemberQuery, [
+			id,
+			userGroupId,
+		]);
+
+		return response.result;
+	}
+}
 
 export { UserGroupsMembersService };
 export default UserGroupsService;

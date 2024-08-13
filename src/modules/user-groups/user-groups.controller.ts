@@ -21,6 +21,7 @@ class UserGroupsController {
 		this.router.delete("/:clientName/user-groups/:userGroupId", this.delete);
 		this.router.get("/:clientName/user-groups/:userGroupId/members", this.getMembers);
 		this.router.post("/:clientName/user-groups/:userGroupId/members", validateDto(AddUserGroupDto), this.addMember);
+		this.router.delete("/:clientName/user-groups/:userGroupId/members/:groupUserId", this.removeMember);
 	}
 
 	private async get(req: Request, res: Response): Promise<Response> {
@@ -29,7 +30,7 @@ class UserGroupsController {
 
 		const { data, page } = await UserGroupsService.get(clientName, queryParams);
 
-		return res.status(200).json({ message: "succesful listed user groups", data, page });
+		return res.status(200).json({ message: "succesfully listed user groups", data, page });
 	}
 
 	private async create(req: Request, res: Response): Promise<Response> {
@@ -43,7 +44,7 @@ class UserGroupsController {
 
 		const createdUserGroup = await UserGroupsService.create(clientName, req.body);
 
-		return res.status(201).json({ message: "succesful created user group", data: createdUserGroup });
+		return res.status(201).json({ message: "succesfully created user group", data: createdUserGroup });
 	}
 
 	private async update(req: Request, res: Response): Promise<Response> {
@@ -51,7 +52,7 @@ class UserGroupsController {
 
 		const updatedUserGroup = await UserGroupsService.update(clientName, +userGroupId, req.body);
 
-		return res.status(200).json({ message: "succesful updated user group", data: updatedUserGroup });
+		return res.status(200).json({ message: "succesfully updated user group", data: updatedUserGroup });
 	}
 
 	private async delete(req: Request, res: Response): Promise<Response> {
@@ -59,19 +60,25 @@ class UserGroupsController {
 
 		await UserGroupsService.delete(clientName, +userGroupId);
 
-		return res.status(200).json({ message: "succesful deleted user group" });
+		return res.status(200).json({ message: "succesfully deleted user group" });
 	}
 
 	private async getMembers(req: Request, res: Response): Promise<Response> {
 		const { clientName, userGroupId } = req.params;
 		const groupUsers = await UserGroupsMembersService.get(clientName, +userGroupId);
-		return res.status(200).json({ message: "successful listed group users", data: groupUsers });
+		return res.status(200).json({ message: "successfully listed group users", data: groupUsers });
 	}
 
 	private async addMember(req: Request, res: Response): Promise<Response> {
 		const { clientName, userGroupId } = req.params;
-		const groupUsers = await UserGroupsMembersService.add(clientName, +userGroupId, req.body);
-		return res.status(200).json({ message: "successful addded group user", data: groupUsers });
+		const groupUser = await UserGroupsMembersService.create(clientName, +userGroupId, req.body);
+		return res.status(201).json({ message: "successfully added group user", data: groupUser });
+	}
+
+	private async removeMember(req: Request, res: Response): Promise<Response> {
+		const { clientName, groupUserId, userGroupId } = req.params;
+		await UserGroupsMembersService.delete(clientName, +groupUserId, +userGroupId);
+		return res.status(200).json({ message: "successfully removed group user" });
 	}
 }
 
