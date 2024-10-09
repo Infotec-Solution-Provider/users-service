@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@infotecrs/instances-service": "^1.0.0",
     "@nestjs/mapped-types": "^2.0.5",
     "@rgranatodutra/http-errors": "^1.0.7",
     "axios": "^1.7.2",
