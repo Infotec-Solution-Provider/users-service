@@ -4,7 +4,7 @@ import { User } from "../types/user.type";
 import jwt, { JwtPayload } from 'jsonwebtoken';
 
 class AuthService {
-    private secretKey: string = process.env["JWT_SECRET_KEY"]!;
+    private secretKey: string = process.env["JWT_SECRET_KEY"] || "inpulse2025";
 
     public async login(clientName: string, LOGIN: string, SENHA: string): Promise<{
         token: string,
