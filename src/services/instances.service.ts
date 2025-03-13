@@ -3,7 +3,7 @@ import { InstanceSDK } from "@in.pulse-crm/sdk";
 import axios from "axios";
 
 const axiosInstance = axios.create({
-    baseURL: process.env["INSTANCES_SERVICE_URL"]!,
+    baseURL: process.env["INSTANCES_SERVICE_URL"] || "http://localhost:7000/api/instances",
     timeout: 30000
 });
 
