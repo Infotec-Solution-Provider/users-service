@@ -7,6 +7,7 @@ const axiosInstance = axios.create({
     timeout: 30000
 });
 
+console.log(process.env["INSTANCES_SERVICE_URL"]!)
 const instancesService = new InstanceSDK(axiosInstance);
 
 export default instancesService;
