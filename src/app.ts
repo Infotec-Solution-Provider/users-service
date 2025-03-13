@@ -1,4 +1,5 @@
 import "express-async-errors";
+import dotenv from "dotenv";
 import express, { NextFunction, Request, Response } from "express";
 import cors from "cors";
 import { handleRequestError } from "@rgranatodutra/http-errors";
@@ -11,6 +12,7 @@ import GoalsController from "./controllers/deactivated/goals.controller";
 import SipConfigsController from "./controllers/deactivated/sip-configs.controller"; */
 import AuthController from "./controllers/auth.controller";
 import { Logger } from "@in.pulse-crm/utils";
+dotenv.config();
 
 const app = express();
 
