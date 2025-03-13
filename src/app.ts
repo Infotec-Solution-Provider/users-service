@@ -1,5 +1,5 @@
 import "express-async-errors";
-import express from "express";
+import express, { NextFunction, Request, Response } from "express";
 import cors from "cors";
 import { handleRequestError } from "@rgranatodutra/http-errors";
 import getRouterEndpoints from "inpulse-crm/utils/src/getRouterEndpoints.util";
@@ -10,6 +10,7 @@ import PausesController from "./controllers/deactivated/pauses.controller";
 import GoalsController from "./controllers/deactivated/goals.controller";
 import SipConfigsController from "./controllers/deactivated/sip-configs.controller"; */
 import AuthController from "./controllers/auth.controller";
+import { Logger } from "@in.pulse-crm/utils";
 
 const app = express();
 
@@ -35,6 +36,11 @@ app.use(serviceEndpoint, controllers.pauses.router);
 app.use(serviceEndpoint, controllers.goals.router);
 app.use(serviceEndpoint, controllers.sipConfigs.router); */
 app.use(serviceEndpoint, controllers.auth.router);
+
+app.use((err: Error, req: Request, _res: Response, next: NextFunction) => {
+    Logger.error(req.url, err);
+    next(err);
+});
 
 app.use(handleRequestError);
 
