@@ -164,24 +164,24 @@ class QueryBuilder<T> {
                 const [start, end] = (value as string).split("_");
 
                 if (start) {
-                    queryFilters.push(`AND ${key} >= '${start}'`);
+                    queryFilters.push(`${key} >= '${start}'`);
                     queryParams.push(new Date(value as string));
                 }
                 if (end) {
-                    queryFilters.push(`AND ${key} <= '${end}'`);
+                    queryFilters.push(`${key} <= '${end}'`);
                     queryParams.push(new Date(value as string));
                 }
             }
             else if (this.likeColumns.includes(key as keyof T)) {
-                queryFilters.push(`AND ${key} LIKE ?`);
+                queryFilters.push(`${key} LIKE ?`);
                 queryParams.push(`%${value}%`);
             }
             else if (Array.isArray(value)) {
-                queryFilters.push(`AND ${key} IN (${value.map(_ => "?").join(", ")})`);
+                queryFilters.push(`${key} IN (${value.map(_ => "?").join(", ")})`);
                 queryParams.push(...value);
             }
             else {
-                queryFilters.push(`AND ${key} = ?`);
+                queryFilters.push(`${key} = ?`);
                 queryParams.push(value);
             }
         });
