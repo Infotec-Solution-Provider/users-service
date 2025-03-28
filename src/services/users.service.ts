@@ -23,7 +23,9 @@ class UsersService {
 
         const { query, params } = this.qb.createSelect("*", filters, offset, limit);
 
+        console.log(query, params);
         const result = await instancesService.executeQuery<Array<User>>(instance, query, params);
+
 
         return toPaginated(result, +page, +perPage);
     }

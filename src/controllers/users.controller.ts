@@ -6,6 +6,8 @@ import { UpdateUserDto } from "../dto/update-user.dto";
 import { User } from "../types/user.type";
 import { FilterWithPaginationQueryParameters } from "inpulse-crm/utils";
 import usersService from "../services/users.service";
+import isAuthenticated from "../middlewares/is-authenticated.middleware";
+import isAdmin from "../middlewares/is-admin.middleware";
 
 class UsersController {
     public readonly router: core.Router;
@@ -13,14 +15,15 @@ class UsersController {
     constructor() {
         this.router = Router();
 
-        this.router.get("/:instance/users", this.get);
-        this.router.post("/:instance/users", validateDto(CreateUserDto), this.create);
-        this.router.patch("/:instance/users/:userId", validateDto(UpdateUserDto), this.update);
-        this.router.delete("/:instance/users/:userId", this.deactivate);
+        this.router.get("/users", isAuthenticated, this.get);
+        this.router.post("/users", validateDto(CreateUserDto), isAuthenticated, isAdmin, this.create);
+        this.router.patch("/users/:userId", validateDto(UpdateUserDto), isAuthenticated, isAdmin, this.update);
+        this.router.delete("/users/:userId", isAuthenticated, isAdmin, this.deactivate);
     }
 
     private async get(req: Request, res: Response): Promise<Response> {
-        const instance = req.params["instance"]!
+        req.query["SETOR"] = String(req.session.sectorId);
+        const instance = req.session.instance;
         const queryParams = req.query as FilterWithPaginationQueryParameters<User>;
 
         const { data, page } = await usersService.search(instance, queryParams);
@@ -29,7 +32,7 @@ class UsersController {
     }
 
     private async create(req: Request, res: Response): Promise<Response> {
-        const instance = req.params["instance"]!
+        const instance = req.session.instance;
 
         const createdUser = await usersService.create(instance, req.body);
 
@@ -37,7 +40,7 @@ class UsersController {
     }
 
     private async update(req: Request, res: Response): Promise<Response> {
-        const instance = req.params["instance"]!
+        const instance = req.session.instance;
         const userId = +req.params["userId"]!;
 
         const updatedUser = await usersService.update(instance, userId, req.body);
@@ -46,7 +49,7 @@ class UsersController {
     }
 
     private async deactivate(req: Request, res: Response): Promise<Response> {
-        const instance = req.params["instance"]!
+        const instance = req.session.instance;
         const userId = +req.params["userId"]!;
 
         const deactivatedUser = await usersService.update(instance, +userId, { ATIVO: "NAO" });

@@ -1,14 +1,19 @@
+import "dotenv/config";
 import { UnauthenticatedError } from "@rgranatodutra/http-errors";
 import instancesService from "./instances.service";
 import { User } from "../types/user.type";
-import jwt, { JwtPayload } from 'jsonwebtoken';
+import jwt, { JwtPayload } from "jsonwebtoken";
 
 class AuthService {
     private secretKey: string = process.env["JWT_SECRET_KEY"] || "inpulse2025";
 
-    public async login(clientName: string, LOGIN: string, SENHA: string): Promise<{
-        token: string,
-        user: User
+    public async login(
+        clientName: string,
+        LOGIN: string,
+        SENHA: string
+    ): Promise<{
+        token: string;
+        user: User;
     }> {
         const FIND_USER_QUERY = `SELECT *
             FROM operadores
@@ -17,7 +22,7 @@ class AuthService {
 
         const user = await instancesService
             .executeQuery<Array<User>>(clientName, FIND_USER_QUERY, [LOGIN, SENHA])
-            .then(data => {
+            .then((data) => {
                 return data[0];
             });
 
@@ -25,41 +30,48 @@ class AuthService {
             throw new UnauthenticatedError("invalid login or password");
         }
 
-        const token = jwt.sign({
-            userId: user.CODIGO,
-            role: user.NIVEL
-        }, this.secretKey, { subject: clientName, expiresIn: "7d" });
+        const token = jwt.sign(
+            {
+                instance: clientName,
+                userId: user.CODIGO,
+                sectorId: user.SETOR,
+                role: user.NIVEL,
+            },
+            this.secretKey,
+            { expiresIn: "7d" }
+        );
 
         return { token, user };
     }
 
-    public async recoverSessionUser(clientName: string, token: string)/* : Promise<User> */ {
-        const decodedToken = jwt.verify(token, this.secretKey, { subject: clientName }) as JwtPayload;
+    public async recoverSessionUser(token: string) /* : Promise<User> */ {
+        const decodedToken = jwt.verify(token, this.secretKey) as JwtPayload;
 
         const FIND_USER_QUERY = `SELECT *
                                  FROM operadores
-                                 WHERE CODIGO = ?`
+                                 WHERE CODIGO = ?`;
 
         const findUser = await instancesService
-            .executeQuery<Array<User>>(clientName, FIND_USER_QUERY, [decodedToken["userId"]])
-            .then(data => data[0]);
+            .executeQuery<Array<User>>(decodedToken["instance"], FIND_USER_QUERY, [decodedToken["userId"]])
+            .then((data) => data[0]);
 
         if (!findUser || findUser.ATIVO === "NAO") {
             throw new UnauthenticatedError("user doesn't exist or isn't active");
         }
 
-
         return findUser;
     }
 
-    public async recoverSessionData(clientName: string, token: string): Promise<{ userId: number, role: string }> {
-        const decodedToken = jwt.verify(token, this.secretKey, { subject: clientName });
+    public async recoverSessionData(
+        token: string
+    ): Promise<{ instance: string; userId: number; role: string; sectorId: number }> {
+        const decodedToken = jwt.verify(token, this.secretKey);
 
         if (!decodedToken) {
             throw new UnauthenticatedError("invalid token");
         }
 
-        return decodedToken as { userId: number, role: string } & JwtPayload;
+        return decodedToken as { instance: string; userId: number; role: string; sectorId: number } & JwtPayload;
     }
 }
 
