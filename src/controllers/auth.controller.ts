@@ -10,30 +10,23 @@ class AuthController {
     constructor() {
         this.router = Router();
 
-        this.router.post("/:instance/login", validateDto(LoginDto), this.login);
-        this.router.get("/auth/", this.recoverSessionData);
-        this.router.get("/auth/user", this.recoverSessionUser);
+        this.router.post("/auth/login", validateDto(LoginDto), this.login);
+        this.router.get("/auth/session", this.recoverSessionData);
     }
 
     private async login(req: Request, res: Response): Promise<Response> {
-        const { LOGIN, SENHA } = req.body;
-        const instance = req.params["instance"]!
+        const { LOGIN, SENHA, instance } = req.body;
 
         const data = await AuthService.login(instance, LOGIN, SENHA);
 
         return res.status(200).json({ message: "successful authentication", data });
     }
 
-    private async recoverSessionUser(req: Request, res: Response): Promise<Response> {
-        const token = (req.headers["authorization"] as string).replaceAll("Bearer ", "").trim();
-        const data = await AuthService.recoverSessionUser(token);
-
-        return res.status(200).json({ message: "successful recovered session user", data });
-    }
-
     private async recoverSessionData(req: Request, res: Response): Promise<Response> {
         const token = (req.headers["authorization"] as string).replaceAll("Bearer ", "").trim();
         const data = await AuthService.recoverSessionData(token);
+
+        console.log("TOKEN:", token);
 
         return res.status(200).json({ message: "successful recovered session data", data });
     }

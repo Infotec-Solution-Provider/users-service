@@ -8,6 +8,7 @@ import { FilterWithPaginationQueryParameters } from "inpulse-crm/utils";
 import usersService from "../services/users.service";
 import isAuthenticated from "../middlewares/is-authenticated.middleware";
 import isAdmin from "../middlewares/is-admin.middleware";
+import { NotFoundError, UnauthorizedError } from "@rgranatodutra/http-errors";
 
 class UsersController {
     public readonly router: core.Router;
@@ -18,6 +19,7 @@ class UsersController {
         this.router.get("/users", isAuthenticated, this.get);
         this.router.post("/users", validateDto(CreateUserDto), isAuthenticated, isAdmin, this.create);
         this.router.patch("/users/:userId", validateDto(UpdateUserDto), isAuthenticated, isAdmin, this.update);
+        this.router.get("/users/:userId", isAuthenticated, this.getUserById);
         this.router.delete("/users/:userId", isAuthenticated, isAdmin, this.deactivate);
     }
 
@@ -29,6 +31,23 @@ class UsersController {
         const { data, page } = await usersService.search(instance, queryParams);
 
         return res.status(200).json({ message: "succesful listed users", data, page });
+    }
+
+    private async getUserById(req: Request, res: Response): Promise<Response> {
+        const instance = req.session.instance;
+        const userId = Number(req.params["userId"]);
+
+        if (userId && userId !== req.session.userId) {
+            throw new UnauthorizedError("You can't access another user's data");
+        }
+
+        const data = await usersService.getById(instance, userId);
+
+        if (!data) {
+            throw new NotFoundError("User not found");
+        }
+
+        return res.status(200).json({ message: "succesful ", data });
     }
 
     private async create(req: Request, res: Response): Promise<Response> {

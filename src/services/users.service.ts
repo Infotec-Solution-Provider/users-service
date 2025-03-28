@@ -30,6 +30,14 @@ class UsersService {
         return toPaginated(result, +page, +perPage);
     }
 
+    public async getById(instance: string, id: number) {
+        const query = "SELECT * FROM operadores WHERE CODIGO = ?";
+        const params = [id];
+        
+        return instancesService.executeQuery<Array<User>>(instance, query, params).then(data => data[0]);
+    }
+
+
     public async create(instance: string, data: User) {
         data.CODIGO = await instancesService
             .executeQuery<Array<{ id: number }>>(instance, "SELECT MAX(CODIGO) AS id FROM operadores", [])

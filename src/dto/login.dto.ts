@@ -6,4 +6,7 @@ export class LoginDto {
 
     @IsString()
     SENHA: string;
+
+    @IsString()
+    instance: string;
 }

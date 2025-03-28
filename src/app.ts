@@ -26,7 +26,7 @@ const controllers = {
     auth: new AuthController()
 }
 
-const serviceEndpoint = "/api/users-service";
+const serviceEndpoint = "/api";
 
 app.use(express.json());
 app.use(cors());
