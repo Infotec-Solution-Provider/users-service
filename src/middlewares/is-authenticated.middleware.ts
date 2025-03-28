@@ -9,7 +9,6 @@ async function isAuthenticated(req: Request, _res: Response, next: NextFunction)
         throw new UnauthenticatedError("token not provided");
     }
 
-    console.log("MIDDLEWARE TOKEN:", token);
     const session = await authService.recoverSessionData(token.replaceAll("Bearer ", "").trim());
 
     req["session"] = session;

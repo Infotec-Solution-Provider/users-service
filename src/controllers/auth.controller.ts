@@ -19,14 +19,12 @@ class AuthController {
 
         const data = await AuthService.login(instance, LOGIN, SENHA);
 
-        return res.status(200).json({ message: "successful authentication", data });
+        return res.status(200).json({ message: "successful authentication", data: data });
     }
 
     private async recoverSessionData(req: Request, res: Response): Promise<Response> {
         const token = (req.headers["authorization"] as string).replaceAll("Bearer ", "").trim();
         const data = await AuthService.recoverSessionData(token);
-
-        console.log("TOKEN:", token);
 
         return res.status(200).json({ message: "successful recovered session data", data });
     }
