@@ -1,13 +1,6 @@
 import "dotenv/config";
-import { InstanceSDK } from "@in.pulse-crm/sdk";
-import axios from "axios";
+import { InstancesClient } from "@in.pulse-crm/sdk";
 
-const axiosInstance = axios.create({
-    baseURL: process.env["INSTANCES_SERVICE_URL"] || "http://localhost:7000/api/instances",
-    timeout: 30000
-});
+const INSTANCES_API_URL = process.env["INSTANCES_API_URL"] || "http://localhost:8000";
 
-console.log(process.env["INSTANCES_SERVICE_URL"]!)
-const instancesService = new InstanceSDK(axiosInstance);
-
-export default instancesService;
+export default new InstancesClient(INSTANCES_API_URL);

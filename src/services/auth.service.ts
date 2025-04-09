@@ -15,16 +15,11 @@ class AuthService {
         token: string;
         user: User;
     }> {
-        const FIND_USER_QUERY = `SELECT *
-            FROM operadores
-            WHERE LOGIN = ?
-              AND SENHA = ?`;
+        const FIND_USER_QUERY = `SELECT * FROM operadores WHERE LOGIN = ? AND SENHA = ?`;
 
         const user = await instancesService
             .executeQuery<Array<User>>(clientName, FIND_USER_QUERY, [LOGIN, SENHA])
-            .then((data) => {
-                return data[0];
-            });
+            .then((data) => data[0]);
 
         if (!user) {
             throw new UnauthenticatedError("invalid login or password");
@@ -47,9 +42,7 @@ class AuthService {
     public async recoverSessionUser(token: string) /* : Promise<User> */ {
         const decodedToken = jwt.verify(token, this.secretKey) as JwtPayload;
 
-        const FIND_USER_QUERY = `SELECT *
-                                 FROM operadores
-                                 WHERE CODIGO = ?`;
+        const FIND_USER_QUERY = `SELECT * FROM operadores WHERE CODIGO = ?`;
 
         const findUser = await instancesService
             .executeQuery<Array<User>>(decodedToken["instance"], FIND_USER_QUERY, [decodedToken["userId"]])
