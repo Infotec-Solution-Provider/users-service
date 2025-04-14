@@ -26,7 +26,7 @@ class UserSessions {
 class OnlineSessionsService {
   private sessions = new Map<string, Array<UserSessions>>();
 
-  public getSessions(instance: string) {
+  public getSessionsByInstance(instance: string) {
     let sessions = this.sessions.get(instance);
 
     if (!sessions) {
@@ -39,7 +39,7 @@ class OnlineSessionsService {
 
   public async addTokenToSession(token: string) {
     const sessionData = await authService.recoverSessionData(token);
-    const sessions = this.getSessions(sessionData.instance);
+    const sessions = this.getSessionsByInstance(sessionData.instance);
 
     let userSessions = sessions.find(
       (s) => s.data.userId === sessionData.userId
@@ -55,7 +55,7 @@ class OnlineSessionsService {
 
   public async removeTokenFromSession(token: string) {
     const sessionData = await authService.recoverSessionData(token);
-    const sessions = this.getSessions(sessionData.instance);
+    const sessions = this.getSessionsByInstance(sessionData.instance);
     const userSessions = sessions.find((s) => s.onlineTokens.includes(token));
 
     if (userSessions) {
