@@ -94,7 +94,7 @@ class UsersService {
 			message: "successfully listed users",
 			data,
 			page: {
-				total: Math.ceil(countResult[0]!.count / +perPage || 1),
+				totalRows: Math.ceil(countResult[0]!.count / +perPage || 1),
 				current: +page,
 			},
 		};
