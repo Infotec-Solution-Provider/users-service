@@ -73,8 +73,6 @@ class UsersService {
 		countQuery.orderBy(String(sortBy), "asc");
 		countQuery.count({ count: "*" });
 
-		console.log(countQuery.toSQL().sql, countQuery.toSQL().bindings as any[]);
-
 		const countResult = await UsersClient.executeQuery<{ count: number }[]>(
 			instance,
 			countQuery.toSQL().sql,
