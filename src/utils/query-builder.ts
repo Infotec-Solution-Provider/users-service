@@ -94,8 +94,8 @@ class QueryBuilder<T> {
      *          - `params`: Um array de valores correspondendo aos placeholders na query.
      */
     public createInsert(data: Partial<T>) {
-        const columns = Object.keys(data);
-        const values = Object.values(data);
+        const columns = Object.keys(data) as Array<keyof T>;
+        const values = Object.values(data) as Array<any>;
         const insertQuery = `INSERT INTO ${this.table} (${columns.join(", ")}) VALUES (${columns.map(_ => "?").join(", ")})`;
 
         return {
