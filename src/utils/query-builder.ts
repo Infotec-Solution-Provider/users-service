@@ -96,8 +96,7 @@ class QueryBuilder<T> {
     public createInsert(data: Partial<T>) {
         const columns = Object.keys(data);
         const values = Object.values(data);
-
-        const insertQuery = `INSERT INTO ${this.table} (${columns.map(_ => "?").join(", ")})`;
+        const insertQuery = `INSERT INTO ${this.table} (${columns.join(", ")}) VALUES (${columns.map(_ => "?").join(", ")})`;
 
         return {
             query: insertQuery,
