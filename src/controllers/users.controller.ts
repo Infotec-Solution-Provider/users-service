@@ -4,7 +4,7 @@ import * as core from "express-serve-static-core";
 import usersService from "../services/users.service";
 import isAuthenticated from "../middlewares/is-authenticated.middleware";
 import isAdmin from "../middlewares/is-admin.middleware";
-import { NotFoundError, UnauthorizedError } from "@rgranatodutra/http-errors";
+import { NotFoundError } from "@rgranatodutra/http-errors";
 import { RequestFilters, User } from "@in.pulse-crm/sdk";
 
 class UsersController {
