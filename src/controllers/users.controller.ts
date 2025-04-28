@@ -32,10 +32,6 @@ class UsersController {
 		const instance = req.session.instance;
 		const userId = Number(req.params["userId"]);
 
-		if (userId && userId !== req.session.userId) {
-			throw new UnauthorizedError("You can't access another user's data");
-		}
-
 		const data = await usersService.getById(instance, userId);
 
 		if (!data) {
