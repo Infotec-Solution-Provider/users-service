@@ -97,7 +97,7 @@ class QueryBuilder<T> {
         const columns = Object.keys(data);
         const values = Object.values(data);
 
-        const insertQuery = `INSERT INTO ${this.table} (${columns.map(_ => "?").join(", ")})`;
+        const insertQuery = `INSERT INTO ${this.table} (${columns.map(_ => _).join(", ")}) values (${columns.map(_ => "?").join(", ")})`;
 
         return {
             query: insertQuery,

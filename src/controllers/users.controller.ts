@@ -17,9 +17,9 @@ class UsersController {
         this.router = Router();
 
         this.router.get("/users", isAuthenticated, this.get);
+        this.router.get("/users/:userId", isAuthenticated, this.getUserById);
         this.router.post("/users", validateDto(CreateUserDto), isAuthenticated, isAdmin, this.create);
         this.router.patch("/users/:userId", validateDto(UpdateUserDto), isAuthenticated, isAdmin, this.update);
-        this.router.get("/users/:userId", isAuthenticated, this.getUserById);
         this.router.delete("/users/:userId", isAuthenticated, isAdmin, this.deactivate);
     }
 
@@ -55,7 +55,7 @@ class UsersController {
 
         const createdUser = await usersService.create(instance, req.body);
 
-        return res.status(201).json({ message: "succesful created user", data: createdUser });
+        return res.status(201).json({ message: "succesfully created user", data: createdUser });
     }
 
     private async update(req: Request, res: Response): Promise<Response> {
