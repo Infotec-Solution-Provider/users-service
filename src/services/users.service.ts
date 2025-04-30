@@ -42,10 +42,20 @@ class UsersService {
       client: "mysql2",
     }).from("operadores");
 
+    
     if (filters.CODIGO) {
       dataQuery.where("CODIGO", String(filters.CODIGO));
       countQuery.where("CODIGO", String(filters.CODIGO));
-      dataQuery.where("CODIGO", String(filters.CODIGO));
+    }
+
+      if (filters.SETOR) {
+        dataQuery.where("SETOR", String(filters.SETOR));
+        countQuery.where("SETOR", String(filters.SETOR));
+      }
+
+    if (filters.NIVEL) {
+      dataQuery.where("NIVEL", String(filters.NIVEL));
+      countQuery.where("NIVEL", String(filters.NIVEL));
     }
 
     if (filters.NOME) {
