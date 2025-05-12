@@ -31,6 +31,7 @@ class AuthService {
 				userId: user.CODIGO,
 				sectorId: user.SETOR,
 				role: user.NIVEL,
+				name: user.NOME,
 			},
 			this.secretKey,
 			{ expiresIn: "7d" }
