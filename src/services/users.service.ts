@@ -35,12 +35,15 @@ class UsersService {
       ...filters
     }: RequestFilters<User>
   ) {
-    const countQuery = knex<User>({
+    const countQuery = knex<User & { DESATIVAR_EXIBICAO_WHATS?: boolean }>({
       client: "mysql2",
     }).from("operadores");
-    const dataQuery = knex<User>({
+    const dataQuery = knex<User & { DESATIVAR_EXIBICAO_WHATS?: boolean }>({
       client: "mysql2",
     }).from("operadores");
+
+    dataQuery.where("DESATIVAR_EXIBICAO_WHATS", false);
+    countQuery.where("DESATIVAR_EXIBICAO_WHATS", false);
 
     if (filters.CODIGO) {
       dataQuery.where("CODIGO", String(filters.CODIGO));
@@ -102,11 +105,9 @@ class UsersService {
       .limit(+perPage)
       .offset((+page - 1) * +perPage);
 
-    const data = await UsersClient.executeQuery<User[]>(
-      instance,
-      dataQuery.toSQL().sql,
-      dataQuery.toSQL().bindings as any[]
-    );
+    const data = await UsersClient.executeQuery<
+      (User & { DESATIVAR_EXIBICAO_WHATS?: boolean })[]
+    >(instance, dataQuery.toSQL().sql, dataQuery.toSQL().bindings as any[]);
 
     return {
       message: "successfully listed users",
