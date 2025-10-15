@@ -46,7 +46,6 @@ class UsersService {
     countQuery.where("DESATIVAR_EXIBICAO_WHATS", false);
 
     if (filters.CODIGO) {
-      dataQuery.where("CODIGO", String(filters.CODIGO));
       countQuery.where("CODIGO", String(filters.CODIGO));
       dataQuery.where("CODIGO", String(filters.CODIGO));
     }
@@ -59,6 +58,11 @@ class UsersService {
     if (filters.LOGIN) {
       countQuery.whereLike("LOGIN", `%${filters.LOGIN}%`);
       dataQuery.whereLike("LOGIN", `%${filters.LOGIN}%`);
+    }
+
+    if (filters.NIVEL) {
+      countQuery.where("NIVEL", String(filters.NIVEL));
+      dataQuery.where("NIVEL", String(filters.NIVEL));
     }
 
     if (filters.EMAIL) {
@@ -91,6 +95,11 @@ class UsersService {
       dataQuery.where("EXPIRA_EM", "<=", filters.EXPIRA_EM);
     }
 
+    if (filters.SETOR) {
+      countQuery.where("SETOR", Number(filters.SETOR));
+      dataQuery.where("SETOR", Number(filters.SETOR));
+    }
+
     countQuery.orderBy(String(sortBy), "asc");
     countQuery.count({ count: "*" });
 
@@ -109,11 +118,15 @@ class UsersService {
       (User & { DESATIVAR_EXIBICAO_WHATS?: boolean })[]
     >(instance, dataQuery.toSQL().sql, dataQuery.toSQL().bindings as any[]);
 
+    const totalRows = countResult[0]?.count ?? 0;
+    const totalPages = Math.max(1, Math.ceil(totalRows / +perPage));
+
     return {
       message: "successfully listed users",
       data,
       page: {
-        totalRows: Math.ceil(countResult[0]!.count / +perPage || 1),
+        totalRows,
+        totalPages,
         current: +page,
       },
     };
@@ -141,6 +154,10 @@ class UsersService {
   }
 
   public async update(instance: string, id: number, data: Partial<User>) {
+    if (!data || Object.keys(data).length === 0) {
+      // No data to update, return or throw an error as needed
+      return;
+    }
     const { query, params } = this.qb.createUpdate(id, data);
     await UsersClient.executeQuery(instance, query, params);
   }
