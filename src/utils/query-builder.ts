@@ -94,8 +94,20 @@ class QueryBuilder<T> {
      *          - `params`: Um array de valores correspondendo aos placeholders na query.
      */
     public createInsert(data: Partial<T>) {
-        const columns = Object.keys(data) as Array<keyof T>;
-        const values = Object.values(data) as Array<any>;
+        const entries = Object.entries(data).filter(([_, v]) => {
+            if (v === undefined || v === null) return false;
+            if (typeof v === 'string' && v.trim() === '') return false;
+            if (Array.isArray(v) && v.length === 0) return false;
+            return true;
+        }) as Array<[keyof T, any]>;
+
+        const columns = entries.map(([k]) => String(k));
+        const values = entries.map(([_, v]) => v);
+
+        if (columns.length === 0) {
+            throw new Error('Nenhuma coluna válida para inserir após filtrar valores vazios.');
+        }
+
         const insertQuery = `INSERT INTO ${this.table} (${columns.join(", ")}) VALUES (${columns.map(_ => "?").join(", ")})`;
 
         return {
@@ -114,8 +126,19 @@ class QueryBuilder<T> {
      *   - `params`: Um array de parâmetros a serem usados com a query, incluindo os novos valores e o valor da chave primária.
      */
     public createUpdate(pk: string | number, data: Partial<T>) {
-        const columns = Object.keys(data);
-        const values = Object.values(data);
+        const entries = Object.entries(data).filter(([_, v]) => {
+            if (v === undefined || v === null) return false;
+            if (typeof v === 'string' && v.trim() === '') return false;
+            if (Array.isArray(v) && v.length === 0) return false;
+            return true;
+        }) as Array<[string, any]>;
+
+        const columns = entries.map(([k]) => k);
+        const values = entries.map(([_, v]) => v);
+
+        if (columns.length === 0) {
+            throw new Error('Nenhuma coluna válida para atualizar após filtrar valores vazios.');
+        }
 
         const updateQuery = `UPDATE ${this.table} SET ${columns.map(c => `${c} = ?`).join(", ")} WHERE ${String(this.pk)} = ?`;
 
