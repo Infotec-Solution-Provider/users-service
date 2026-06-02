@@ -6,6 +6,7 @@ import isAuthenticated from "../middlewares/is-authenticated.middleware";
 import isAdmin from "../middlewares/is-admin.middleware";
 import { NotFoundError } from "@rgranatodutra/http-errors";
 import { RequestFilters, User } from "@in.pulse-crm/sdk";
+import { GlobalSipConfig, SipConfig } from "../types/sip-config.type";
 
 class UsersController {
 	public readonly router: core.Router;
@@ -18,6 +19,11 @@ class UsersController {
 		this.router.patch("/users/:userId", isAuthenticated, isAdmin, this.update);
 		this.router.get("/users/:userId", isAuthenticated, this.getUserById);
 		this.router.delete("/users/:userId", isAuthenticated, isAdmin, this.deactivate);
+		this.router.get("/sip-configs", isAuthenticated, isAdmin, this.getSipConfigs);
+		this.router.get("/sip-global-config", isAuthenticated, isAdmin, this.getGlobalSipConfig);
+		this.router.get("/users/:userId/sip-config", isAuthenticated, isAdmin, this.getUserSipConfig);
+		this.router.put("/sip-global-config", isAuthenticated, isAdmin, this.upsertGlobalSipConfig);
+		this.router.put("/users/:userId/sip-config", isAuthenticated, isAdmin, this.upsertUserSipConfig);
 	}
 
 	private async get(req: Request, res: Response): Promise<Response> {
@@ -65,6 +71,44 @@ class UsersController {
 		const deactivatedUser = await usersService.update(instance, +userId, { ATIVO: "NAO" });
 
 		return res.status(200).json({ message: "succesful deactivated user", data: deactivatedUser });
+	}
+
+	private async getSipConfigs(req: Request, res: Response): Promise<Response> {
+		const filters = req.query as RequestFilters<SipConfig>;
+		const { data, page } = await usersService.getSipConfigs(req.session.instance, filters);
+
+		return res.status(200).json({ message: "succesfully listed sip configs", data, page });
+	}
+
+	private async getUserSipConfig(req: Request, res: Response): Promise<Response> {
+		const instance = req.session.instance;
+		const userId = Number(req.params["userId"]);
+		const data = await usersService.getSipConfigByOperator(instance, userId);
+
+		return res.status(200).json({ message: "succesfully loaded user sip config", data });
+	}
+
+	private async getGlobalSipConfig(req: Request, res: Response): Promise<Response> {
+		const data = await usersService.getGlobalSipConfig(req.session.instance);
+
+		return res.status(200).json({ message: "succesfully loaded global sip config", data });
+	}
+
+	private async upsertUserSipConfig(req: Request, res: Response): Promise<Response> {
+		const instance = req.session.instance;
+		const userId = Number(req.params["userId"]);
+		const data = await usersService.upsertSipConfigByOperator(instance, userId, req.body as Partial<SipConfig>);
+
+		return res.status(200).json({ message: "succesfully updated user sip config", data });
+	}
+
+	private async upsertGlobalSipConfig(req: Request, res: Response): Promise<Response> {
+		const data = await usersService.upsertGlobalSipConfig(
+			req.session.instance,
+			req.body as Partial<GlobalSipConfig>
+		);
+
+		return res.status(200).json({ message: "succesfully updated global sip config", data });
 	}
 }
 
