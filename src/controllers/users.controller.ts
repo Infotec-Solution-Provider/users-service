@@ -4,9 +4,10 @@ import * as core from "express-serve-static-core";
 import usersService from "../services/users.service";
 import isAuthenticated from "../middlewares/is-authenticated.middleware";
 import isAdmin from "../middlewares/is-admin.middleware";
-import { NotFoundError } from "@rgranatodutra/http-errors";
+import { NotFoundError, UnauthorizedError } from "@rgranatodutra/http-errors";
 import { RequestFilters, User } from "@in.pulse-crm/sdk";
 import { GlobalSipConfig, SipConfig } from "../types/sip-config.type";
+import { UserNotificationPreferences } from "../types/notification-preferences.type";
 
 class UsersController {
 	public readonly router: core.Router;
@@ -24,6 +25,25 @@ class UsersController {
 		this.router.get("/users/:userId/sip-config", isAuthenticated, isAdmin, this.getUserSipConfig);
 		this.router.put("/sip-global-config", isAuthenticated, isAdmin, this.upsertGlobalSipConfig);
 		this.router.put("/users/:userId/sip-config", isAuthenticated, isAdmin, this.upsertUserSipConfig);
+		this.router.get(
+			"/users/:userId/notification-preferences",
+			isAuthenticated,
+			this.getUserNotificationPreferences,
+		);
+		this.router.put(
+			"/users/:userId/notification-preferences",
+			isAuthenticated,
+			this.upsertUserNotificationPreferences,
+		);
+	}
+
+	private assertCanManageUser(req: Request, userId: number): void {
+		const sessionUserId = Number(req.session.userId);
+		const isAdminRole = req.session.role === "ADMIN";
+
+		if (!isAdminRole && sessionUserId !== userId) {
+			throw new UnauthorizedError("you can only manage your own notification preferences");
+		}
 	}
 
 	private async get(req: Request, res: Response): Promise<Response> {
@@ -109,6 +129,30 @@ class UsersController {
 		);
 
 		return res.status(200).json({ message: "succesfully updated global sip config", data });
+	}
+
+	private async getUserNotificationPreferences(req: Request, res: Response): Promise<Response> {
+		const instance = req.session.instance;
+		const userId = Number(req.params["userId"]);
+		this.assertCanManageUser(req, userId);
+
+		const data = await usersService.getNotificationPreferences(instance, userId);
+
+		return res.status(200).json({ message: "succesfully loaded notification preferences", data });
+	}
+
+	private async upsertUserNotificationPreferences(req: Request, res: Response): Promise<Response> {
+		const instance = req.session.instance;
+		const userId = Number(req.params["userId"]);
+		this.assertCanManageUser(req, userId);
+
+		const data = await usersService.upsertNotificationPreferences(
+			instance,
+			userId,
+			req.body as Partial<UserNotificationPreferences>,
+		);
+
+		return res.status(200).json({ message: "succesfully updated notification preferences", data });
 	}
 }
 

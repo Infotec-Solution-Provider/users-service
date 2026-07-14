@@ -4,6 +4,38 @@ import QueryBuilder from "../utils/query-builder";
 import knex from "knex";
 import { RequestFilters } from "@in.pulse-crm/sdk";
 import { GlobalSipConfig, SipConfig } from "../types/sip-config.type";
+import {
+  NotificationEventKey,
+  NotificationEventPreferences,
+  UserNotificationPreferences,
+} from "../types/notification-preferences.type";
+
+const NOTIFICATION_EVENT_KEYS: NotificationEventKey[] = [
+  "new_message",
+  "new_conversation",
+  "mention",
+];
+
+const NOTIFICATION_SOUND_FILES = [
+  "/notify-chat.mp3",
+  "/notify-message.mp3",
+  "/notify-mention.mp3",
+] as const;
+const ALLOWED_NOTIFICATION_SOUND_FILES = new Set<string>(NOTIFICATION_SOUND_FILES);
+
+const DEFAULT_EVENT_CONFIG: NotificationEventPreferences = {
+  enabled: true,
+  suppressWhenChatFocused: true,
+  channels: {
+    toast: false,
+    browser: true,
+    sound: {
+      enabled: true,
+      file: "/notify-message.mp3",
+      volume: 0.5,
+    },
+  },
+};
 
 const GLOBAL_SIP_CONFIG_FIELDS = [
   "ASTERISK_SERVER",
@@ -79,6 +111,227 @@ class UsersService {
 
       return acc;
     }, {} as Partial<Record<GlobalSipConfigField, string | null>>);
+  }
+
+  private clampVolume(value: unknown, fallback: number): number {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return fallback;
+    }
+    return Math.max(0, Math.min(1, parsed));
+  }
+
+  private normalizeEventConfig(raw: unknown, fallback: NotificationEventPreferences): NotificationEventPreferences {
+    const data = (raw ?? {}) as Partial<NotificationEventPreferences>;
+    const channels = (data.channels ?? {}) as Partial<NotificationEventPreferences["channels"]>;
+    const sound = (channels.sound ?? {}) as Partial<NotificationEventPreferences["channels"]["sound"]>;
+
+    return {
+      enabled: typeof data.enabled === "boolean" ? data.enabled : fallback.enabled,
+      suppressWhenChatFocused:
+        typeof data.suppressWhenChatFocused === "boolean"
+          ? data.suppressWhenChatFocused
+          : fallback.suppressWhenChatFocused,
+      channels: {
+        toast: typeof channels.toast === "boolean" ? channels.toast : fallback.channels.toast,
+        browser: typeof channels.browser === "boolean" ? channels.browser : fallback.channels.browser,
+        sound: {
+          enabled:
+            typeof sound.enabled === "boolean"
+              ? sound.enabled
+              : fallback.channels.sound.enabled,
+          file:
+            typeof sound.file === "string" && ALLOWED_NOTIFICATION_SOUND_FILES.has(sound.file.trim())
+              ? sound.file.trim()
+              : fallback.channels.sound.file,
+          volume: this.clampVolume(sound.volume, fallback.channels.sound.volume),
+        },
+      },
+    };
+  }
+
+  private pickFirstDefined<T>(...values: Array<T | undefined>): T | undefined {
+    return values.find((value) => value !== undefined);
+  }
+
+  private getLegacyEvents(raw: unknown): Partial<
+    Record<
+      | "external_new_message"
+      | "internal_new_message"
+      | "external_new_conversation"
+      | "internal_new_conversation",
+      NotificationEventPreferences
+    >
+  > {
+    return (raw ?? {}) as Partial<
+      Record<
+        | "external_new_message"
+        | "internal_new_message"
+        | "external_new_conversation"
+        | "internal_new_conversation",
+        NotificationEventPreferences
+      >
+    >;
+  }
+
+  private getDefaultNotificationPreferences(): UserNotificationPreferences {
+    return {
+      version: 1,
+      events: {
+        new_message: this.normalizeEventConfig(
+          {
+            ...DEFAULT_EVENT_CONFIG,
+            channels: {
+              ...DEFAULT_EVENT_CONFIG.channels,
+              sound: { ...DEFAULT_EVENT_CONFIG.channels.sound, enabled: true },
+            },
+          },
+          DEFAULT_EVENT_CONFIG
+        ),
+        new_conversation: this.normalizeEventConfig(
+          {
+            ...DEFAULT_EVENT_CONFIG,
+            suppressWhenChatFocused: false,
+            channels: {
+              ...DEFAULT_EVENT_CONFIG.channels,
+              sound: {
+                ...DEFAULT_EVENT_CONFIG.channels.sound,
+                enabled: false,
+                file: "/notify-chat.mp3",
+              },
+            },
+          },
+          DEFAULT_EVENT_CONFIG
+        ),
+        mention: this.normalizeEventConfig(
+          {
+            ...DEFAULT_EVENT_CONFIG,
+            suppressWhenChatFocused: false,
+            channels: {
+              ...DEFAULT_EVENT_CONFIG.channels,
+              sound: {
+                ...DEFAULT_EVENT_CONFIG.channels.sound,
+                enabled: true,
+                file: "/notify-mention.mp3",
+              },
+            },
+          },
+          DEFAULT_EVENT_CONFIG
+        ),
+      },
+    };
+  }
+
+  private normalizePreferences(raw: unknown): UserNotificationPreferences {
+    const defaults = this.getDefaultNotificationPreferences();
+    const payload = (raw ?? {}) as Partial<UserNotificationPreferences>;
+    const rawEvents = (payload.events ?? {}) as Partial<
+      Record<NotificationEventKey, NotificationEventPreferences>
+    >;
+    const legacyEvents = this.getLegacyEvents(payload.events);
+
+    const mergedRawEvents: Partial<Record<NotificationEventKey, NotificationEventPreferences>> = {
+      new_message: this.pickFirstDefined(
+        rawEvents.new_message,
+        legacyEvents.internal_new_message,
+        legacyEvents.external_new_message,
+      ),
+      new_conversation: this.pickFirstDefined(
+        rawEvents.new_conversation,
+        legacyEvents.internal_new_conversation,
+        legacyEvents.external_new_conversation,
+      ),
+      mention: this.pickFirstDefined(rawEvents.mention, legacyEvents.internal_new_message),
+    };
+
+    const normalizedEvents = NOTIFICATION_EVENT_KEYS.reduce(
+      (acc, key) => {
+        const base = defaults.events[key];
+        acc[key] = this.normalizeEventConfig(mergedRawEvents[key], base);
+        return acc;
+      },
+      {} as Record<NotificationEventKey, NotificationEventPreferences>
+    );
+
+    return {
+      version: typeof payload.version === "number" ? payload.version : defaults.version,
+      events: normalizedEvents,
+    };
+  }
+
+  private async ensureNotificationPreferencesTable(instance: string): Promise<void> {
+    const query = `
+      CREATE TABLE IF NOT EXISTS user_notification_preferences (
+        id INT NOT NULL AUTO_INCREMENT,
+        user_id INT NOT NULL,
+        preferences_json LONGTEXT NOT NULL,
+        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_user_notification_preferences_user_id (user_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    `;
+
+    await UsersClient.executeQuery(instance, query, []);
+  }
+
+  public async getNotificationPreferences(
+    instance: string,
+    userId: number
+  ): Promise<UserNotificationPreferences> {
+    await this.ensureNotificationPreferencesTable(instance);
+
+    const query = knex({ client: "mysql2" })
+      .from("user_notification_preferences")
+      .select("preferences_json")
+      .where("user_id", userId)
+      .first()
+      .toSQL();
+
+    const rows = await UsersClient.executeQuery<Array<{ preferences_json: string }>>(
+      instance,
+      query.sql,
+      query.bindings as unknown[]
+    );
+
+    if (!rows[0]?.preferences_json) {
+      return this.getDefaultNotificationPreferences();
+    }
+
+    try {
+      const parsed = JSON.parse(rows[0].preferences_json) as unknown;
+      return this.normalizePreferences(parsed);
+    } catch {
+      return this.getDefaultNotificationPreferences();
+    }
+  }
+
+  public async upsertNotificationPreferences(
+    instance: string,
+    userId: number,
+    payload: Partial<UserNotificationPreferences>
+  ): Promise<UserNotificationPreferences> {
+    await this.ensureNotificationPreferencesTable(instance);
+
+    const current = await this.getNotificationPreferences(instance, userId);
+    const merged = this.normalizePreferences({
+      ...current,
+      ...payload,
+      events: {
+        ...current.events,
+        ...(payload.events ?? {}),
+      },
+    });
+
+    const query = `
+      INSERT INTO user_notification_preferences (user_id, preferences_json)
+      VALUES (?, ?)
+      ON DUPLICATE KEY UPDATE preferences_json = VALUES(preferences_json), updated_at = CURRENT_TIMESTAMP
+    `;
+
+    await UsersClient.executeQuery(instance, query, [userId, JSON.stringify(merged)]);
+
+    return merged;
   }
 
   public async getUsers(
