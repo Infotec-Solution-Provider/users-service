@@ -230,19 +230,30 @@ class UsersService {
     >;
     const legacyEvents = this.getLegacyEvents(payload.events);
 
-    const mergedRawEvents: Partial<Record<NotificationEventKey, NotificationEventPreferences>> = {
-      new_message: this.pickFirstDefined(
-        rawEvents.new_message,
-        legacyEvents.internal_new_message,
-        legacyEvents.external_new_message,
-      ),
-      new_conversation: this.pickFirstDefined(
-        rawEvents.new_conversation,
-        legacyEvents.internal_new_conversation,
-        legacyEvents.external_new_conversation,
-      ),
-      mention: this.pickFirstDefined(rawEvents.mention, legacyEvents.internal_new_message),
-    };
+    const mergedRawEvents: Partial<Record<NotificationEventKey, NotificationEventPreferences>> = {};
+
+    const newMessageEvent = this.pickFirstDefined(
+      rawEvents.new_message,
+      legacyEvents.internal_new_message,
+      legacyEvents.external_new_message,
+    );
+    if (newMessageEvent !== undefined) {
+      mergedRawEvents.new_message = newMessageEvent;
+    }
+
+    const newConversationEvent = this.pickFirstDefined(
+      rawEvents.new_conversation,
+      legacyEvents.internal_new_conversation,
+      legacyEvents.external_new_conversation,
+    );
+    if (newConversationEvent !== undefined) {
+      mergedRawEvents.new_conversation = newConversationEvent;
+    }
+
+    const mentionEvent = this.pickFirstDefined(rawEvents.mention, legacyEvents.internal_new_message);
+    if (mentionEvent !== undefined) {
+      mergedRawEvents.mention = mentionEvent;
+    }
 
     const normalizedEvents = NOTIFICATION_EVENT_KEYS.reduce(
       (acc, key) => {
