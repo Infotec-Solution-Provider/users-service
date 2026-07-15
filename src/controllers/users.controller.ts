@@ -28,12 +28,12 @@ class UsersController {
 		this.router.get(
 			"/users/:userId/notification-preferences",
 			isAuthenticated,
-			this.getUserNotificationPreferences,
+			this.getUserNotificationPreferences.bind(this),
 		);
 		this.router.put(
 			"/users/:userId/notification-preferences",
 			isAuthenticated,
-			this.upsertUserNotificationPreferences,
+			this.upsertUserNotificationPreferences.bind(this),
 		);
 	}
 
