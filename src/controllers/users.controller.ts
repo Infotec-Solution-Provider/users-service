@@ -8,6 +8,10 @@ import { NotFoundError, UnauthorizedError } from "@rgranatodutra/http-errors";
 import { RequestFilters, User } from "@in.pulse-crm/sdk";
 import { GlobalSipConfig, SipConfig } from "../types/sip-config.type";
 import { UserNotificationPreferences } from "../types/notification-preferences.type";
+import {
+	PushNotificationPayload,
+	PushSubscriptionPayload,
+} from "../types/push-notification.type";
 
 class UsersController {
 	public readonly router: core.Router;
@@ -35,6 +39,18 @@ class UsersController {
 			isAuthenticated,
 			this.upsertUserNotificationPreferences.bind(this),
 		);
+		this.router.get("/push/vapid-public-key", isAuthenticated, this.getPushVapidPublicKey.bind(this));
+		this.router.post(
+			"/users/:userId/push-subscriptions",
+			isAuthenticated,
+			this.upsertPushSubscription.bind(this),
+		);
+		this.router.delete(
+			"/users/:userId/push-subscriptions",
+			isAuthenticated,
+			this.removePushSubscription.bind(this),
+		);
+		this.router.post("/_internal/push-notifications", this.sendInternalPushNotification.bind(this));
 	}
 
 	private assertCanManageUser(req: Request, userId: number): void {
@@ -43,6 +59,15 @@ class UsersController {
 
 		if (!isAdminRole && sessionUserId !== userId) {
 			throw new UnauthorizedError("you can only manage your own notification preferences");
+		}
+	}
+
+	private assertInternalPushRequest(req: Request): void {
+		const expectedSecret = process.env["PUSH_NOTIFICATIONS_SECRET"];
+		const providedSecret = req.headers["x-inpulse-push-secret"];
+
+		if (!expectedSecret || providedSecret !== expectedSecret) {
+			throw new UnauthorizedError("invalid push notification service credentials");
 		}
 	}
 
@@ -153,6 +178,47 @@ class UsersController {
 		);
 
 		return res.status(200).json({ message: "succesfully updated notification preferences", data });
+	}
+
+	private async getPushVapidPublicKey(_req: Request, res: Response): Promise<Response> {
+		const publicKey = usersService.getPushVapidPublicKey();
+		return res.status(200).json({ data: { publicKey } });
+	}
+
+	private async upsertPushSubscription(req: Request, res: Response): Promise<Response> {
+		const userId = Number(req.params["userId"]);
+		this.assertCanManageUser(req, userId);
+		await usersService.upsertPushSubscription(
+			req.session.instance,
+			userId,
+			req.body as PushSubscriptionPayload,
+		);
+		return res.status(204).send();
+	}
+
+	private async removePushSubscription(req: Request, res: Response): Promise<Response> {
+		const userId = Number(req.params["userId"]);
+		this.assertCanManageUser(req, userId);
+		const endpoint = String(req.body?.endpoint || "").trim();
+		if (endpoint) {
+			await usersService.removePushSubscription(req.session.instance, userId, endpoint);
+		}
+		return res.status(204).send();
+	}
+
+	private async sendInternalPushNotification(req: Request, res: Response): Promise<Response> {
+		this.assertInternalPushRequest(req);
+		const userId = Number(req.body?.userId);
+		if (!Number.isInteger(userId)) {
+			throw new Error("invalid push notification user id");
+		}
+
+		const sent = await usersService.sendPushNotification(
+			String(req.body?.instance || ""),
+			userId,
+			req.body?.payload as PushNotificationPayload,
+		);
+		return res.status(200).json({ data: { sent } });
 	}
 }
 

@@ -2,6 +2,8 @@ import { User } from "@in.pulse-crm/sdk";
 import UsersClient from "./instances.service";
 import QueryBuilder from "../utils/query-builder";
 import knex from "knex";
+import { createHash } from "crypto";
+import webpush from "web-push";
 import { RequestFilters } from "@in.pulse-crm/sdk";
 import { GlobalSipConfig, SipConfig } from "../types/sip-config.type";
 import {
@@ -9,6 +11,10 @@ import {
   NotificationEventPreferences,
   UserNotificationPreferences,
 } from "../types/notification-preferences.type";
+import {
+  PushNotificationPayload,
+  PushSubscriptionPayload,
+} from "../types/push-notification.type";
 
 const NOTIFICATION_EVENT_KEYS: NotificationEventKey[] = [
   "new_message",
@@ -284,6 +290,130 @@ class UsersService {
     `;
 
     await UsersClient.executeQuery(instance, query, []);
+  }
+
+  private async ensurePushSubscriptionsTable(instance: string): Promise<void> {
+    const query = `
+      CREATE TABLE IF NOT EXISTS user_push_subscriptions (
+        id INT NOT NULL AUTO_INCREMENT,
+        user_id INT NOT NULL,
+        endpoint_hash CHAR(64) NOT NULL,
+        subscription_json LONGTEXT NOT NULL,
+        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_user_push_subscriptions_endpoint_hash (endpoint_hash),
+        KEY idx_user_push_subscriptions_user_id (user_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    `;
+
+    await UsersClient.executeQuery(instance, query, []);
+  }
+
+  private getPushSubscriptionHash(endpoint: string): string {
+    return createHash("sha256").update(endpoint).digest("hex");
+  }
+
+  public getPushVapidPublicKey(): string | null {
+    return process.env["WEB_PUSH_VAPID_PUBLIC_KEY"] || null;
+  }
+
+  public async upsertPushSubscription(
+    instance: string,
+    userId: number,
+    subscription: PushSubscriptionPayload,
+  ): Promise<void> {
+    await this.ensurePushSubscriptionsTable(instance);
+
+    const endpoint = subscription.endpoint.trim();
+    if (!endpoint || !subscription.keys?.auth || !subscription.keys?.p256dh) {
+      throw new Error("invalid push subscription");
+    }
+
+    const query = `
+      INSERT INTO user_push_subscriptions (user_id, endpoint_hash, subscription_json)
+      VALUES (?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        user_id = VALUES(user_id),
+        subscription_json = VALUES(subscription_json),
+        updated_at = CURRENT_TIMESTAMP
+    `;
+
+    await UsersClient.executeQuery(instance, query, [
+      userId,
+      this.getPushSubscriptionHash(endpoint),
+      JSON.stringify({ ...subscription, endpoint }),
+    ]);
+  }
+
+  public async removePushSubscription(instance: string, userId: number, endpoint: string): Promise<void> {
+    await this.ensurePushSubscriptionsTable(instance);
+
+    const query = knex({ client: "mysql2" })
+      .from("user_push_subscriptions")
+      .where("user_id", userId)
+      .where("endpoint_hash", this.getPushSubscriptionHash(endpoint))
+      .delete()
+      .toSQL();
+
+    await UsersClient.executeQuery(instance, query.sql, query.bindings as unknown[]);
+  }
+
+  public async sendPushNotification(
+    instance: string,
+    userId: number,
+    payload: PushNotificationPayload,
+  ): Promise<number> {
+    const publicKey = this.getPushVapidPublicKey();
+    const privateKey = process.env["WEB_PUSH_VAPID_PRIVATE_KEY"];
+    const subject = process.env["WEB_PUSH_VAPID_SUBJECT"];
+
+    if (!publicKey || !privateKey || !subject) {
+      throw new Error("web push is not configured");
+    }
+
+    const preferences = await this.getNotificationPreferences(instance, userId);
+    const eventPreferences = preferences.events[payload.event];
+    if (!eventPreferences.enabled || !eventPreferences.channels.browser) {
+      return 0;
+    }
+
+    await this.ensurePushSubscriptionsTable(instance);
+    webpush.setVapidDetails(subject, publicKey, privateKey);
+
+    const query = knex({ client: "mysql2" })
+      .from("user_push_subscriptions")
+      .select("id", "subscription_json")
+      .where("user_id", userId)
+      .toSQL();
+    const rows = await UsersClient.executeQuery<Array<{ id: number; subscription_json: string }>>(
+      instance,
+      query.sql,
+      query.bindings as unknown[],
+    );
+
+    let sent = 0;
+    await Promise.all(
+      rows.map(async (row) => {
+        try {
+          const subscription = JSON.parse(row.subscription_json) as PushSubscriptionPayload;
+          await webpush.sendNotification(subscription, JSON.stringify(payload));
+          sent++;
+        } catch (error) {
+          const statusCode = (error as { statusCode?: number }).statusCode;
+          if (statusCode === 404 || statusCode === 410) {
+            const deleteQuery = knex({ client: "mysql2" })
+              .from("user_push_subscriptions")
+              .where("id", row.id)
+              .delete()
+              .toSQL();
+            await UsersClient.executeQuery(instance, deleteQuery.sql, deleteQuery.bindings as unknown[]);
+          }
+        }
+      }),
+    );
+
+    return sent;
   }
 
   public async getNotificationPreferences(
