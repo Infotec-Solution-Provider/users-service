@@ -39,7 +39,7 @@ class UsersController {
 			isAuthenticated,
 			this.upsertUserNotificationPreferences.bind(this),
 		);
-		this.router.get("/push/vapid-public-key", isAuthenticated, this.getPushVapidPublicKey.bind(this));
+		this.router.get("/users/push/vapid-public-key", isAuthenticated, this.getPushVapidPublicKey.bind(this));
 		this.router.post(
 			"/users/:userId/push-subscriptions",
 			isAuthenticated,
