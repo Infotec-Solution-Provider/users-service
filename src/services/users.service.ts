@@ -282,11 +282,11 @@ class UsersService {
         id INT NOT NULL AUTO_INCREMENT,
         user_id INT NOT NULL,
         preferences_json LONGTEXT NOT NULL,
-        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NULL DEFAULT NULL,
         PRIMARY KEY (id),
         UNIQUE KEY uq_user_notification_preferences_user_id (user_id)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+      ) ENGINE=InnoDB
     `;
 
     await UsersClient.executeQuery(instance, query, []);
@@ -299,12 +299,12 @@ class UsersService {
         user_id INT NOT NULL,
         endpoint_hash CHAR(64) NOT NULL,
         subscription_json LONGTEXT NOT NULL,
-        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NULL DEFAULT NULL,
         PRIMARY KEY (id),
         UNIQUE KEY uq_user_push_subscriptions_endpoint_hash (endpoint_hash),
         KEY idx_user_push_subscriptions_user_id (user_id)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+      ) ENGINE=InnoDB
     `;
 
     await UsersClient.executeQuery(instance, query, []);
