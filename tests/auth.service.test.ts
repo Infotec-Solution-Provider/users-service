@@ -83,6 +83,20 @@ beforeEach(() => {
 });
 
 describe("refresh authentication", () => {
+	it("uses a refresh-session schema compatible with legacy MySQL timestamp rules", async () => {
+		await authService.login("tenant-legacy-mysql", "operator", "secret");
+
+		const queries = vi.mocked(instancesService.executeQuery).mock.calls.map((call) => call[1]);
+		const createTable = queries.find((query) => query.includes("CREATE TABLE"));
+		const insertSession = queries.find((query) => query.includes("INSERT INTO auth_refresh_sessions"));
+
+		expect(createTable).toContain("created_at DATETIME NOT NULL");
+		expect(createTable).toContain("last_used_at DATETIME NOT NULL");
+		expect(createTable).not.toContain("TIMESTAMP");
+		expect(insertSession).toContain("created_at, last_used_at");
+		expect(insertSession).toContain("NOW(), NOW()");
+	});
+
   it("issues a short access token and rotates the refresh token with sliding expiry", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));

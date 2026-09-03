@@ -271,8 +271,8 @@ class AuthService {
 		await instancesService.executeQuery(
 			instance,
 			`INSERT INTO auth_refresh_sessions
-			 (session_id, user_id, current_token_hash, expires_at, user_agent_hash)
-			 VALUES (?, ?, ?, ?, ?)`,
+			 (session_id, user_id, current_token_hash, expires_at, user_agent_hash, created_at, last_used_at)
+			 VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
 			[
 				sessionId,
 				user.CODIGO,
@@ -297,8 +297,8 @@ class AuthService {
 			 expires_at DATETIME NOT NULL,
 			 revoked_at DATETIME NULL,
 			 user_agent_hash CHAR(64) NULL,
-			 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			 last_used_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			 created_at DATETIME NOT NULL,
+			 last_used_at DATETIME NOT NULL,
 			 PRIMARY KEY (session_id),
 			 KEY idx_auth_refresh_user (user_id),
 			 KEY idx_auth_refresh_expiry (expires_at)
