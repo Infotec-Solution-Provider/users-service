@@ -14,7 +14,6 @@ class UserSessions {
 
   public addToken(token: string) {
     if (!this.onlineTokens.includes(token)) {
-      console.log(`Adding token ${token} from session ${this.data.userId}`);
       this.onlineTokens.push(token);
     }
   }
@@ -55,7 +54,7 @@ class OnlineSessionsService {
   }
 
   public async removeTokenFromSession(token: string) {
-    const sessionData = await authService.recoverSessionData(token);
+    const sessionData = await authService.recoverSessionDataForPresenceCleanup(token);
     const sessions = this.getSessionsByInstance(sessionData.instance);
     const userSessions = sessions.find((s) => s.onlineTokens.includes(token));
 

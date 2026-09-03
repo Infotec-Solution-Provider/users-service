@@ -12,7 +12,19 @@ dotenv.config();
 const app = express();
 
 app.use(express.json());
-app.use(cors());
+const allowedOrigins = new Set(
+  (process.env["AUTH_ALLOWED_ORIGINS"] || "http://localhost:3000,https://inpulse.infotecrs.inf.br")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+);
+app.use(cors({
+  credentials: true,
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+    return callback(new Error("origin not allowed"));
+  },
+}));
 
 app.use("/api", usersController.router);
 app.use("/api", authController.router);

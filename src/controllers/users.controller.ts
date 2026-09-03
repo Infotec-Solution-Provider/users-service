@@ -1,5 +1,4 @@
 import { Request, Response, Router } from "express";
-import * as core from "express-serve-static-core";
 
 import usersService from "../services/users.service";
 import isAuthenticated from "../middlewares/is-authenticated.middleware";
@@ -12,9 +11,10 @@ import {
 	PushNotificationPayload,
 	PushSubscriptionPayload,
 } from "../types/push-notification.type";
+import authService from "../services/auth.service";
 
 class UsersController {
-	public readonly router: core.Router;
+	public readonly router: Router;
 
 	constructor() {
 		this.router = Router();
@@ -105,6 +105,9 @@ class UsersController {
 		const userId = +req.params["userId"]!;
 
 		const updatedUser = await usersService.update(instance, userId, req.body);
+		if (req.body?.SENHA !== undefined || req.body?.ATIVO === "NAO") {
+			await authService.revokeUserSessions(instance, userId);
+		}
 
 		return res.status(200).json({ message: "succesful updated user", data: updatedUser });
 	}
@@ -114,6 +117,7 @@ class UsersController {
 		const userId = +req.params["userId"]!;
 
 		const deactivatedUser = await usersService.update(instance, +userId, { ATIVO: "NAO" });
+		await authService.revokeUserSessions(instance, userId);
 
 		return res.status(200).json({ message: "succesful deactivated user", data: deactivatedUser });
 	}

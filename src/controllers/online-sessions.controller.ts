@@ -1,10 +1,9 @@
-import { Router } from "express";
-import * as core from "express-serve-static-core";
+import { Request, Response, Router } from "express";
 import onlineSessionsService from "../services/online-sessions.service";
 import { BadRequestError, UnauthenticatedError } from "@rgranatodutra/http-errors";
 
 class OnlineSessionsController {
-	public readonly router: core.Router;
+	public readonly router: Router;
 
 	constructor() {
 		this.router = Router();
@@ -13,7 +12,7 @@ class OnlineSessionsController {
 		this.router.delete("/online-sessions", this.finishSession);
 	}
 
-	private async getSessions(req: core.Request, res: core.Response) {
+	private async getSessions(req: Request, res: Response) {
 		const instance = req.query["instance"];
 
 		if (!instance || typeof instance !== "string") {
@@ -28,7 +27,7 @@ class OnlineSessionsController {
 		});
 	}
 
-	private async initSession(req: core.Request, res: core.Response) {
+	private async initSession(req: Request, res: Response) {
 		const token = req.headers.authorization?.replace("Bearer ", "");
 
 		if (!token) {
@@ -40,7 +39,7 @@ class OnlineSessionsController {
 		res.status(200).json({ message: "Token added successfully" });
 	}
 
-	private async finishSession(req: core.Request, res: core.Response) {
+	private async finishSession(req: Request, res: Response) {
 		const token = req.headers.authorization?.replace("Bearer ", "");
 
 		if (!token) {
