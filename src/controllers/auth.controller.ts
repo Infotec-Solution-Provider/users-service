@@ -9,10 +9,10 @@ class AuthController {
 	constructor() {
 		this.router = Router();
 
-		this.router.post("/auth/login", loginRateLimit, this.login);
-		this.router.post("/auth/refresh", this.refresh);
-		this.router.post("/auth/logout", this.logout);
-		this.router.get("/auth/session", this.recoverSessionData);
+		this.router.post("/auth/login", loginRateLimit, this.login.bind(this));
+		this.router.post("/auth/refresh", this.refresh.bind(this));
+		this.router.post("/auth/logout", this.logout.bind(this));
+		this.router.get("/auth/session", this.recoverSessionData.bind(this));
 	}
 
 	private async login(req: Request, res: Response): Promise<Response> {
