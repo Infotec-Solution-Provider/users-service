@@ -53,7 +53,9 @@ Na central: o ramal precisa existir com `allow=ulaw` ou `alaw` e **não pode est
 
 ## Validação (quando for testar)
 
-Use um ramal de teste que não esteja em filas nem em uso. Na central `infotec-tel` (172.22.75.124), os candidatos levantados em 30/09/2026 são `4003` e `4005` ("Testes in.Pulse", sem conversas nos últimos 30 dias e fora das filas).
+Use um ramal de teste que não esteja em filas nem em uso. Na central `infotec-tel` (172.22.75.124), o ramal definido pela equipe para os testes de compatibilidade com o Asterisk 1.8 é o **`2010`** (fora das filas, sem conversas nos últimos 30 dias em 30/09/2026). Alternativas: `4003` e `4005` ("Testes in.Pulse").
+
+O 2010 costuma estar registrado num Zoiper (192.168.15.102). Feche o Zoiper durante o teste pelo navegador: o `chan_sip` guarda um único registro por ramal, e o Zoiper retomaria o registro na renovação seguinte, desviando as chamadas recebidas. No perfil do ramal (contexto `1`), chamadas externas recentes foram recusadas com `no-rights`; comece por chamadas internas e confira o formato de discagem externa antes de testá-la.
 
 1. `kamailio -c -f kamailio.cfg` (sintaxe) e `rtpengine --config-file=... --foreground` sem erros.
 2. Conectar a telefonia no navegador; no Kamailio, log `conn N bound to 4003:172.22.75.124:5060`; na central, `sip show peers` com o ramal registrado a partir do IP ZeroTier do gateway. Se o REGISTER receber `403 Not Authorized`, o `$conid` do handshake não é o mesmo das mensagens SIP (a documentação não garante isso; pelo código-fonte deveria ser).
