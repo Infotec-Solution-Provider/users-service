@@ -1,5 +1,6 @@
 import { BadRequestError } from "@rgranatodutra/http-errors";
 import { SipConfig } from "../types/sip-config.type";
+import { formatPbxAddress, parsePbxAddress } from "./telephony-gateway";
 
 interface IceServer {
   urls: string[];
@@ -13,12 +14,24 @@ export interface WebrtcTenantConfig {
   iceServers: IceServer[];
 }
 
+/** "direct": the browser talks to a WebRTC-capable PBX. "gateway": in.pulse bridges WebRTC to a legacy SIP PBX. */
+export type WebrtcConnectionMode = "direct" | "gateway";
+
 export interface WebrtcSettings extends WebrtcTenantConfig {
   enabled: boolean;
+  mode: WebrtcConnectionMode;
+  pbxAddress: string;
+}
+
+export interface SipIdentity {
+  extension: string;
+  authorizationUser: string;
+  sipUser: string;
+  password: string;
 }
 
 export function emptyWebrtcSettings(): WebrtcSettings {
-  return { enabled: false, websocketUrl: "", domain: "", iceServers: [] };
+  return { enabled: false, mode: "direct", websocketUrl: "", domain: "", pbxAddress: "", iceServers: [] };
 }
 
 export function serializeIceServers(servers: IceServer[]): string {
@@ -35,13 +48,21 @@ export function validateWebrtcSettings(config: unknown): WebrtcSettings {
     throw new BadRequestError("Informe se a telefonia web está habilitada.");
   }
   const enabled = config["enabled"];
+  // Settings saved before the gateway existed have no mode: they are direct connections.
+  const mode = config["mode"] ?? "direct";
+  if (mode !== "direct" && mode !== "gateway") throw new BadRequestError("Modo de conexão da telefonia web inválido.");
   if (typeof config["websocketUrl"] !== "string" || typeof config["domain"] !== "string") {
     throw new BadRequestError("Informe o endereço WSS e o domínio SIP da instância.");
   }
+  const pbxAddressInput = config["pbxAddress"] ?? "";
+  if (typeof pbxAddressInput !== "string") throw new BadRequestError("Endereço da central inválido.");
   const websocketUrl = config["websocketUrl"].trim();
   const domain = config["domain"].trim();
   const iceServers = validateIceServers(config["iceServers"] ?? []);
-  if (!enabled && !websocketUrl && !domain) return { enabled, websocketUrl, domain, iceServers };
+  const pbxAddress = validatePbxAddress(pbxAddressInput.trim(), enabled && mode === "gateway");
+  // In gateway mode the browser uses the in.pulse gateway, so the direct fields are optional leftovers.
+  const directRequired = mode === "direct" && (enabled || websocketUrl || domain);
+  if (!directRequired && !websocketUrl && !domain) return { enabled, mode, websocketUrl, domain, pbxAddress, iceServers };
   if (websocketUrl.length > 2048 || domain.length > 255) throw new BadRequestError("Endereço de telefonia muito longo.");
   let url: URL;
   try { url = new URL(websocketUrl); } catch {
@@ -53,7 +74,17 @@ export function validateWebrtcSettings(config: unknown): WebrtcSettings {
   if (!/^[a-zA-Z0-9.-]+(?::[0-9]{1,5})?$/.test(domain)) {
     throw new BadRequestError("Domínio SIP inválido.");
   }
-  return { enabled, websocketUrl: url.toString(), domain, iceServers };
+  return { enabled, mode, websocketUrl: url.toString(), domain, pbxAddress, iceServers };
+}
+
+function validatePbxAddress(value: string, required: boolean): string {
+  if (!value) {
+    if (required) throw new BadRequestError("Informe o endereço SIP da central para usar o gateway.");
+    return "";
+  }
+  const address = parsePbxAddress(value);
+  if (!address) throw new BadRequestError("Endereço da central inválido. Use o IP e, se necessário, a porta: 172.22.0.10:5060.");
+  return formatPbxAddress(address);
 }
 
 function validateIceServers(servers: unknown): IceServer[] {
@@ -78,7 +109,7 @@ function validateIceServers(servers: unknown): IceServer[] {
   return iceServers;
 }
 
-export function buildWebrtcConfig(config: WebrtcTenantConfig, sip: SipConfig | null) {
+export function resolveSipIdentity(sip: SipConfig | null): SipIdentity {
   const extension = sip?.RAMAL_SIP?.trim();
   const authorizationUser = sip?.LOGIN_SIP?.trim() || extension;
   const sipUser = sip?.USRID_SIP?.trim() || extension;
@@ -88,5 +119,11 @@ export function buildWebrtcConfig(config: WebrtcTenantConfig, sip: SipConfig | n
   if (![extension, authorizationUser, sipUser].every(value => /^[a-zA-Z0-9_.+*-]+$/.test(value))) {
     throw new BadRequestError("Identificação do ramal SIP inválida.");
   }
-  return { ...config, extension, uri: `sip:${sipUser}@${config.domain}`, authorizationUser, password: sip.SENHA_SIP };
+  return { extension, authorizationUser, sipUser, password: sip.SENHA_SIP };
+}
+
+export function buildWebrtcConfig(config: WebrtcTenantConfig, sip: SipConfig | null) {
+  const { extension, authorizationUser, sipUser, password } = resolveSipIdentity(sip);
+  const { websocketUrl, domain, iceServers } = config;
+  return { websocketUrl, domain, iceServers, extension, uri: `sip:${sipUser}@${domain}`, authorizationUser, password };
 }
