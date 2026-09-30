@@ -1,0 +1,6 @@
+# rtpengine from Debian, userspace forwarding only (no kernel module), for local gateway tests.
+FROM debian:bookworm-slim
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends rtpengine-daemon \
+ && rm -rf /var/lib/apt/lists/*
+ENTRYPOINT ["rtpengine", "--foreground", "--log-stderr", "--table=-1"]

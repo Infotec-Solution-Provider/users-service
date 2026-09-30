@@ -1,0 +1,51 @@
+# Local test gateway: browser on this machine -> ws://127.0.0.1:8090 -> Kamailio -> PBX over ZeroTier.
+# Values come from local/.env (copy .env.example). See README.md, "Teste local".
+#
+# Docker Desktop forwards the published ports from the ZeroTier address (GW_ZT_IP) into the containers,
+# so Kamailio and rtpengine advertise GW_ZT_IP. rtpengine has a single interface here: the browser
+# reaches the same ZeroTier address from this machine, so no direction= flags are needed.
+name: inpulse-telephony-gateway
+services:
+  kamailio:
+    build:
+      context: ..
+      dockerfile: local/Dockerfile.kamailio
+    environment:
+      GW_WS_ADDR: 10.53.53.10:8090
+      GW_SIP_LISTEN: 10.53.53.10:5060
+      GW_SIP_ADVERTISE: ${GW_ZT_IP:?defina GW_ZT_IP no local/.env}:5060
+      GW_USERS_URL: http://host.docker.internal:8001
+      GW_API_KEY: ${GW_API_KEY:?defina GW_API_KEY no local/.env}
+      GW_ORIGIN: ${GW_ORIGIN:-http://localhost:3000}
+      GW_RTPENGINE: udp:10.53.53.11:2223
+      GW_MEDIA_FROM_BROWSER: ""
+      GW_MEDIA_FROM_PBX: ""
+    ports:
+      - "127.0.0.1:8090:8090/tcp"
+      - "${GW_ZT_IP}:5060:5060/udp"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      gateway:
+        ipv4_address: 10.53.53.10
+    depends_on:
+      - rtpengine
+  rtpengine:
+    build:
+      context: ..
+      dockerfile: local/Dockerfile.rtpengine
+    command:
+      - --interface=10.53.53.11!${GW_ZT_IP}
+      - --listen-ng=10.53.53.11:2223
+      - --port-min=31000
+      - --port-max=31099
+    ports:
+      - "${GW_ZT_IP}:31000-31099:31000-31099/udp"
+    networks:
+      gateway:
+        ipv4_address: 10.53.53.11
+networks:
+  gateway:
+    ipam:
+      config:
+        - subnet: 10.53.53.0/24

@@ -51,6 +51,29 @@ navegador ◀──DTLS-SRTP/ICE──▶ rtpengine ◀──RTP comum (ZeroTier
 
 Na central: o ramal precisa existir com `allow=ulaw` ou `alaw` e **não pode estar registrado ao mesmo tempo em um telefone de mesa** (o `chan_sip` guarda um único registro por ramal; as chamadas recebidas iriam para o último que registrou).
 
+## Teste local (gateway na máquina do desenvolvedor)
+
+Para os testes atuais, o gateway roda em Docker Desktop na máquina de desenvolvimento, com frontend e users-service locais. Tudo fica em `local/`:
+
+```
+navegador (http://localhost:3000) ──ws://127.0.0.1:8090──▶ Kamailio (contêiner)
+Kamailio ──SIP/UDP──▶ central, pelo IP ZeroTier da máquina (GW_ZT_IP)
+navegador ◀──DTLS-SRTP──▶ rtpengine (contêiner) ◀──RTP──▶ central, portas 31000–31099 em GW_ZT_IP
+```
+
+- O users-service aceita `ws://` somente em `localhost`/`127.0.0.1`; por isso não é preciso nginx nem certificado localmente.
+- O rtpengine tem uma única interface: o navegador alcança o próprio IP ZeroTier da máquina, e a central também. Por isso `GW_MEDIA_FROM_*` ficam vazios.
+- O Docker Desktop publica 127.0.0.1:8090/TCP, `GW_ZT_IP`:5060/UDP e `GW_ZT_IP`:31000–31099/UDP.
+
+Passos:
+
+1. `users-service/.env`: `TELEPHONY_GATEWAY_WSS_URL=ws://127.0.0.1:8090/telephony-gw`, `TELEPHONY_GATEWAY_ALLOWED_NETWORKS=172.22.0.0/16` e os dois segredos (reinicie o users-service).
+2. `local/.env` (a partir de `.env.example`): `GW_ZT_IP` (IP ZeroTier da máquina na rede da central) e `GW_API_KEY` igual a `TELEPHONY_GATEWAY_API_KEY`.
+3. Firewall do Windows: o adaptador ZeroTier costuma estar como rede **Pública**. Libere a entrada UDP 5060 e 31000–31099 vinda da central (feito pelo usuário, como administrador), por exemplo:
+   `New-NetFirewallRule -DisplayName "inpulse gateway (teste)" -Direction Inbound -Protocol UDP -LocalPort 5060,31000-31099 -RemoteAddress 172.22.75.124 -Action Allow`
+4. `docker compose -f local/docker-compose.yml up --build` (o contêiner do Kamailio roda `kamailio -c` antes de iniciar).
+5. No tenant de teste, pela tela SIP: modo **Via gateway in.pulse** com o IP da central; em Usuários, o ramal de teste com a mesma senha da central.
+
 ## Validação (quando for testar)
 
 Use um ramal de teste que não esteja em filas nem em uso. Na central `infotec-tel` (172.22.75.124), o ramal definido pela equipe para os testes de compatibilidade com o Asterisk 1.8 é o **`2010`** (fora das filas, sem conversas nos últimos 30 dias em 30/09/2026). Alternativas: `4003` e `4005` ("Testes in.Pulse").

@@ -85,7 +85,10 @@ export function readGatewayEnvironment(env: NodeJS.ProcessEnv = process.env): Ga
   if (allowedNetworks.some(network => network === null)) return null;
   let url: URL;
   try { url = new URL(websocketUrl); } catch { return null; }
-  if (url.protocol !== "wss:" || url.search || url.hash || url.username || url.password) return null;
+  // Plain ws:// only for a gateway on the same machine as the browser (local tests); never across a network.
+  const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  if (!(url.protocol === "wss:" || (url.protocol === "ws:" && loopback))) return null;
+  if (url.search || url.hash || url.username || url.password) return null;
   const ttl = Number(env["TELEPHONY_GATEWAY_TOKEN_TTL_SECONDS"]);
   return {
     websocketUrl: url.toString(), tokenSecret, apiKey, allowedNetworks: allowedNetworks as Ipv4Network[],

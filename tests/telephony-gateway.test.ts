@@ -35,6 +35,9 @@ describe("telephony gateway", () => {
     expect(readGatewayEnvironment({ ...env, TELEPHONY_GATEWAY_TOKEN_SECRET: "short" })).toBeNull();
     expect(readGatewayEnvironment({ ...env, TELEPHONY_GATEWAY_API_KEY: "" })).toBeNull();
     expect(readGatewayEnvironment({ ...env, TELEPHONY_GATEWAY_WSS_URL: "ws://gateway.example.test/telephony-gw" })).toBeNull();
+    expect(readGatewayEnvironment({ ...env, TELEPHONY_GATEWAY_WSS_URL: "ws://172.22.135.225:8090/telephony-gw" })).toBeNull();
+    expect(readGatewayEnvironment({ ...env, TELEPHONY_GATEWAY_WSS_URL: "ws://127.0.0.1:8090/telephony-gw" })?.websocketUrl).toBe("ws://127.0.0.1:8090/telephony-gw");
+    expect(readGatewayEnvironment({ ...env, TELEPHONY_GATEWAY_WSS_URL: "ws://localhost:8090/telephony-gw" })).not.toBeNull();
     expect(readGatewayEnvironment({ ...env, TELEPHONY_GATEWAY_WSS_URL: "wss://gateway.example.test/?token=x" })).toBeNull();
     expect(readGatewayEnvironment({ ...env, TELEPHONY_GATEWAY_ALLOWED_NETWORKS: "" })).toBeNull();
     expect(readGatewayEnvironment({ ...env, TELEPHONY_GATEWAY_ALLOWED_NETWORKS: "0.0.0.0/0" })).toBeNull();

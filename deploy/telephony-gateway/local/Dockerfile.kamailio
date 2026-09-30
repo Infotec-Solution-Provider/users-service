@@ -1,0 +1,12 @@
+# Kamailio 5.8 from the project's Debian repository, for local gateway tests.
+FROM debian:bookworm-slim
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+ && curl -fsSL https://deb.kamailio.org/kamailiodebkey.gpg | gpg --dearmor -o /usr/share/keyrings/kamailio.gpg \
+ && echo "deb [signed-by=/usr/share/keyrings/kamailio.gpg] http://deb.kamailio.org/kamailio58 bookworm main" > /etc/apt/sources.list.d/kamailio.list \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends kamailio kamailio-extra-modules kamailio-utils-modules kamailio-websocket-modules \
+ && rm -rf /var/lib/apt/lists/*
+COPY kamailio.cfg /etc/kamailio/kamailio.cfg
+COPY local/kamailio-entrypoint.sh /usr/local/bin/kamailio-entrypoint.sh
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/kamailio-entrypoint.sh"]
