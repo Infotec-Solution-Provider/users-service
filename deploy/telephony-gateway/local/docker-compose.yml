@@ -20,6 +20,10 @@ services:
       GW_RTPENGINE: udp:10.53.53.11:2223
       GW_MEDIA_FROM_BROWSER: ""
       GW_MEDIA_FROM_PBX: ""
+      GW_TRACE: ${GW_TRACE:-0}
+    # The config is mounted so it can be adjusted during tests without rebuilding the image.
+    volumes:
+      - ../kamailio.cfg:/etc/kamailio/kamailio.cfg:ro
     ports:
       - "127.0.0.1:8090:8090/tcp"
       - "${GW_ZT_IP}:5060:5060/udp"

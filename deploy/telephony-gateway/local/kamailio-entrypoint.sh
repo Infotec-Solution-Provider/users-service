@@ -17,6 +17,8 @@ cat > /etc/kamailio/gateway-defs.cfg <<DEFS
 #!substdef "!GW_MEDIA_FROM_BROWSER!${GW_MEDIA_FROM_BROWSER:-}!g"
 #!substdef "!GW_MEDIA_FROM_PBX!${GW_MEDIA_FROM_PBX:-}!g"
 DEFS
+# GW_TRACE=1 logs every SIP request and reply handled by the gateway (tests only).
+if [ "${GW_TRACE:-}" = "1" ]; then echo '#!define GW_TRACE' >> /etc/kamailio/gateway-defs.cfg; fi
 chmod 600 /etc/kamailio/gateway-defs.cfg
 kamailio -c -f /etc/kamailio/kamailio.cfg
 # GW_CHECK_ONLY=1: validate the configuration and exit without listening (no traffic to any PBX).
