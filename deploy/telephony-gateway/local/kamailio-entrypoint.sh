@@ -19,6 +19,8 @@ cat > /etc/kamailio/gateway-defs.cfg <<DEFS
 DEFS
 # GW_TRACE=1 logs every SIP request and reply handled by the gateway (tests only).
 if [ "${GW_TRACE:-}" = "1" ]; then echo '#!define GW_TRACE' >> /etc/kamailio/gateway-defs.cfg; fi
+# Docker Desktop hides the PBX address behind NAT; the Windows firewall rule restricts the source instead.
+if [ "${GW_PBX_SOURCE_NATTED:-}" = "1" ]; then echo '#!define GW_PBX_SOURCE_NATTED' >> /etc/kamailio/gateway-defs.cfg; fi
 chmod 600 /etc/kamailio/gateway-defs.cfg
 kamailio -c -f /etc/kamailio/kamailio.cfg
 # GW_CHECK_ONLY=1: validate the configuration and exit without listening (no traffic to any PBX).

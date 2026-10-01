@@ -21,6 +21,8 @@ services:
       GW_MEDIA_FROM_BROWSER: ""
       GW_MEDIA_FROM_PBX: ""
       GW_TRACE: ${GW_TRACE:-0}
+      # Docker Desktop NAT hides the PBX source address (see kamailio.cfg, FROM_PBX).
+      GW_PBX_SOURCE_NATTED: "1"
     # The config is mounted so it can be adjusted during tests without rebuilding the image.
     volumes:
       - ../kamailio.cfg:/etc/kamailio/kamailio.cfg:ro
