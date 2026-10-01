@@ -19,4 +19,6 @@ cat > /etc/kamailio/gateway-defs.cfg <<DEFS
 DEFS
 chmod 600 /etc/kamailio/gateway-defs.cfg
 kamailio -c -f /etc/kamailio/kamailio.cfg
+# GW_CHECK_ONLY=1: validate the configuration and exit without listening (no traffic to any PBX).
+if [ "${GW_CHECK_ONLY:-}" = "1" ]; then exit 0; fi
 exec kamailio -DD -E -f /etc/kamailio/kamailio.cfg
