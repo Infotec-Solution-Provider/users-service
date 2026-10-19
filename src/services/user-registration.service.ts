@@ -10,6 +10,7 @@ const descriptions: Record<string, [FieldType, string, string]> = {
   NOME:["text","Nome","Identificação"], LOGIN:["text","Login","Acesso"], SENHA:["password","Senha","Acesso"], EMAIL:["text","E-mail","Identificação"],
   NIVEL:["select","Perfil de acesso","Acesso"], ATIVO:["select","Ativo","Acesso"], EXPIRA_EM:["date","Acesso válido até","Acesso"],
   SETOR:["number","Código do setor","Organização"], CODIGO_ERP:["text","Código ERP","Organização"],
+  AVATAR_ID:["number","Avatar","Identificação"],
   EDITA_CONTATOS:["select","Pode editar contatos","Permissões CRM"], VISUALIZA_COMPRAS:["select","Pode visualizar compras","Permissões CRM"],
   CADASTRO:["select","Edição do cadastro","Permissões CRM"], ALTERA_SENHA:["select","Pode alterar senha","Permissões CRM"],
   AGENDA_LIG:["select","Agenda de ligações","Permissões CRM"], LIGA_REPRESENTANTE:["select","Ligação para representante","Permissões CRM"],
