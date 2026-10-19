@@ -2,9 +2,11 @@ import { BadRequestError, UnauthenticatedError } from "@rgranatodutra/http-error
 import { Request, Response, Router } from "express";
 import AuthService from "../services/auth.service";
 import loginRateLimit from "../middlewares/login-rate-limit.middleware";
+import { resolveAuthCookiePath } from "../utils/auth-cookie-path";
 
 class AuthController {
 	public readonly router: Router;
+	private readonly refreshCookiePath = resolveAuthCookiePath(process.env["AUTH_COOKIE_PATH"]);
 
 	constructor() {
 		this.router = Router();
@@ -75,7 +77,7 @@ class AuthController {
 			httpOnly: true,
 			secure: process.env["NODE_ENV"] === "production" || configuredSecure?.toLowerCase() === "true",
 			sameSite: "lax" as const,
-			path: "/api/auth",
+			path: this.refreshCookiePath,
 		};
 	}
 
