@@ -3,6 +3,7 @@ import UsersClient from "./instances.service";
 import QueryBuilder from "../utils/query-builder";
 import knex from "knex";
 import { createHash } from "crypto";
+import { BadRequestError } from "@rgranatodutra/http-errors";
 import webpush from "web-push";
 import { RequestFilters } from "@in.pulse-crm/sdk";
 import { GlobalSipConfig, SipConfig } from "../types/sip-config.type";
@@ -591,6 +592,7 @@ class UsersService {
   }
 
   public async create(instance: string, data: User) {
+    this.validateMutationFields(data, false);
     data.CODIGO =
       (await UsersClient.executeQuery<Array<{ id: number }>>(
         instance,
@@ -603,12 +605,22 @@ class UsersService {
   }
 
   public async update(instance: string, id: number, data: Partial<User>) {
+    this.validateMutationFields(data, true);
     if (!data || Object.keys(data).length === 0) {
       // No data to update, return or throw an error as needed
       return;
     }
     const { query, params } = this.qb.createUpdate(id, data);
     await UsersClient.executeQuery(instance, query, params);
+  }
+
+  private validateMutationFields(data: unknown, updating: boolean): void {
+    if (!data || typeof data !== "object" || Array.isArray(data) || Object.keys(data).some(key => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || key.toUpperCase() === "CODIGO" || (updating && key.toUpperCase() === "HORARIO"))) {
+      throw new BadRequestError("Campos inválidos. Altere o expediente pela operação específica do usuário.");
+    }
+    if (Object.keys(data).some(key => key.toUpperCase() === "HORARIO")) {
+      throw new BadRequestError("Cadastre o usuário e depois associe o expediente pela operação específica.");
+    }
   }
 
   public async getGlobalSipConfig(instance: string): Promise<GlobalSipConfig | null> {

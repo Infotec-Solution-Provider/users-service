@@ -9,6 +9,7 @@ import authController from "./controllers/auth.controller";
 import onlineSessionsController from "./controllers/online-sessions.controller";
 import webrtcRouter from "./controllers/webrtc.controller";
 import crmParameterSettingsRouter from "./controllers/crm-parameter-settings.controller";
+import crmCatalogsRouter from "./controllers/crm-catalogs.controller";
 dotenv.config();
 
 const app = express();
@@ -33,6 +34,15 @@ app.use("/api", authController.router);
 app.use("/api", onlineSessionsController.router);
 app.use("/api", webrtcRouter);
 app.use("/api", crmParameterSettingsRouter);
+app.use("/api", crmCatalogsRouter);
+
+app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+  if (req.path.startsWith("/api/crm/") && err && typeof err === "object" && "type" in err && err.type === "entity.parse.failed") {
+    res.status(400).json({ code: "CRM_CATALOG_INVALID", message: "JSON inválido." });
+    return;
+  }
+  next(err);
+});
 
 app.use((err: Error, req: Request, _res: Response, next: NextFunction) => {
   Logger.error(req.url, err);
