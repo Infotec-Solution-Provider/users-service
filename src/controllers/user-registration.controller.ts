@@ -3,8 +3,10 @@ import isAuthenticated from '../middlewares/is-authenticated.middleware';
 import { CatalogError } from '../services/crm-catalogs/contract';
 import registration, { UserRegistrationService } from '../services/user-registration.service';
 import authService from '../services/auth.service';
-export function createUserRegistrationRouter(service:UserRegistrationService=registration,authenticate=isAuthenticated,revoke=authService.revokeUserSessions.bind(authService)){
+import { crmTenantAuthentication } from '../middlewares/crm-tenant-scope.middleware';
+export function createUserRegistrationRouter(service:UserRegistrationService=registration,authenticator=isAuthenticated,revoke=authService.revokeUserSessions.bind(authService)){
   const router=Router();
+  const authenticate=crmTenantAuthentication(authenticator);
   router.use('/crm/user-registration',(_req,res,next)=>{res.setHeader('Cache-Control','no-store');next()});
   router.get('/crm/user-registration/schema',authenticate,async(req,res)=>res.json({data:await service.schema(req.session)}));
   router.get('/crm/user-registration/:id',authenticate,async(req,res)=>res.json({data:await service.detail(req.session,req.params['id'])}));

@@ -3,9 +3,11 @@ import isAuthenticated from "../middlewares/is-authenticated.middleware";
 import service, { CrmCatalogsService } from "../services/crm-catalogs/catalogs.service";
 import { CatalogError, catalogs } from "../services/crm-catalogs/contract";
 import salesTypes from "../services/crm-catalogs/sales-types.service";
+import { crmTenantAuthentication } from "../middlewares/crm-tenant-scope.middleware";
 
-export function createCrmCatalogsRouter(catalogService: CrmCatalogsService = service, authenticate = isAuthenticated) {
+export function createCrmCatalogsRouter(catalogService: CrmCatalogsService = service, authenticator = isAuthenticated) {
   const router = Router();
+  const authenticate = crmTenantAuthentication(authenticator);
   router.use("/crm", (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); });
   for (const name of Object.keys(catalogs)) {
     const path = `/crm/${name}`;
