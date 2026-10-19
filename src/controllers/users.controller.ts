@@ -12,6 +12,12 @@ import {
 	PushSubscriptionPayload,
 } from "../types/push-notification.type";
 import authService from "../services/auth.service";
+import registration from "../services/user-registration.service";
+
+function publicUser<T>(value: T): T {
+	if (!value || typeof value !== "object") return value;
+	return Object.fromEntries(Object.entries(value).filter(([key]) => !/SENHA|PASSWORD|TOKEN|SECRET|SIP_KEY|API_KEY/i.test(key))) as T;
+}
 
 class UsersController {
 	public readonly router: Router;
@@ -76,7 +82,7 @@ class UsersController {
 
 		const { data, page } = await usersService.getUsers(req.session.instance, filters);
 
-		return res.status(200).json({ message: "succesfully listed users", data, page });
+		return res.status(200).json({ message: "succesfully listed users", data: data.map(publicUser), page });
 	}
 
 	private async getUserById(req: Request, res: Response): Promise<Response> {
@@ -89,27 +95,25 @@ class UsersController {
 			throw new NotFoundError("User not found");
 		}
 
-		return res.status(200).json({ message: "succesful ", data });
+		return res.status(200).json({ message: "succesful ", data: publicUser(data) });
 	}
 
 	private async create(req: Request, res: Response): Promise<Response> {
-		const instance = req.session.instance;
+		const createdUser = await registration.create(req.session, req.body);
 
-		const createdUser = await usersService.create(instance, req.body);
-
-		return res.status(201).json({ message: "succesful created user", data: createdUser });
+		return res.status(201).json({ message: "succesful created user", data: createdUser.record });
 	}
 
 	private async update(req: Request, res: Response): Promise<Response> {
 		const instance = req.session.instance;
 		const userId = +req.params["userId"]!;
 
-		const updatedUser = await usersService.update(instance, userId, req.body);
+		await usersService.update(instance, userId, req.body);
 		if (req.body?.SENHA !== undefined || req.body?.ATIVO === "NAO") {
 			await authService.revokeUserSessions(instance, userId);
 		}
 
-		return res.status(200).json({ message: "succesful updated user", data: updatedUser });
+		return res.status(200).json({ message: "succesful updated user", data: publicUser(await usersService.getById(instance, userId)) });
 	}
 
 	private async deactivate(req: Request, res: Response): Promise<Response> {

@@ -10,6 +10,7 @@ import onlineSessionsController from "./controllers/online-sessions.controller";
 import webrtcRouter from "./controllers/webrtc.controller";
 import crmParameterSettingsRouter from "./controllers/crm-parameter-settings.controller";
 import crmCatalogsRouter from "./controllers/crm-catalogs.controller";
+import userRegistrationRouter from "./controllers/user-registration.controller";
 dotenv.config();
 
 const app = express();
@@ -35,6 +36,7 @@ app.use("/api", onlineSessionsController.router);
 app.use("/api", webrtcRouter);
 app.use("/api", crmParameterSettingsRouter);
 app.use("/api", crmCatalogsRouter);
+app.use("/api", userRegistrationRouter);
 
 app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
   if (req.path.startsWith("/api/crm/") && err && typeof err === "object" && "type" in err && err.type === "entity.parse.failed") {
