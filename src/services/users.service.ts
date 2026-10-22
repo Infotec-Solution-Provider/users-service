@@ -4,6 +4,9 @@ import QueryBuilder from "../utils/query-builder";
 import knex from "knex";
 import { createHash } from "crypto";
 import { BadRequestError } from "@rgranatodutra/http-errors";
+import { CatalogError } from "./crm-catalogs/contract";
+import { executeQuery } from "./crm-catalogs/tenant-query.client";
+import { assertNoPendingCrmAgenda, noPendingCrmAgenda, requestsDeactivation } from "./user-deactivation.guard";
 import webpush from "web-push";
 import { RequestFilters } from "@in.pulse-crm/sdk";
 import { GlobalSipConfig, SipConfig } from "../types/sip-config.type";
@@ -611,6 +614,22 @@ class UsersService {
       return;
     }
     const { query, params } = this.qb.createUpdate(id, data);
+    if (requestsDeactivation(data)) {
+      if (!Number.isSafeInteger(id) || id <= 0 || id > 2147483647) throw new BadRequestError("Código de usuário inválido.");
+      try {
+        await assertNoPendingCrmAgenda(executeQuery, instance, id);
+        const result = await executeQuery<{ affectedRows: number }>(instance, query + " AND " + noPendingCrmAgenda, [...params, id]);
+        if (result?.affectedRows === 0) {
+          await assertNoPendingCrmAgenda(executeQuery, instance, id);
+          const rows = await executeQuery<Array<{ ATIVO: string }>>(instance, "SELECT ATIVO FROM operadores WHERE CODIGO=? LIMIT 1", [id]);
+          if (rows[0]?.ATIVO !== "NAO") throw new CatalogError(409, "CRM_USER_CHANGED", "Usuário não encontrado ou alterado. Recarregue antes de continuar.");
+        } else if (result?.affectedRows !== 1) throw new Error("Invalid user write result");
+      } catch (error) {
+        if (error instanceof CatalogError) throw error;
+        throw new CatalogError(503, "CRM_USER_WRITE_UNKNOWN", "Não foi possível confirmar a inativação. Recarregue antes de tentar novamente.", "UNKNOWN");
+      }
+      return;
+    }
     await UsersClient.executeQuery(instance, query, params);
   }
 

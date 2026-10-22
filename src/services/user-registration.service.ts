@@ -1,6 +1,7 @@
 import { createHmac, randomBytes } from "node:crypto";
 import { admin, CatalogError, id, object, type Row } from "./crm-catalogs/contract";
 import { executeQuery, TenantQueryError, type ExecuteQuery } from "./crm-catalogs/tenant-query.client";
+import { assertNoPendingCrmAgenda, noPendingCrmAgenda, requestsDeactivation } from "./user-deactivation.guard";
 
 type FieldType = "text" | "password" | "number" | "date" | "select";
 export interface UserRegistrationField { name: string; type: FieldType; label: string; group: string; nullable: boolean; maxLength?: number; options?: string[]; requiredOnCreate?: boolean }
@@ -108,8 +109,11 @@ export class UserRegistrationService {
       const before=await this.row(session.instance,schema,userId);if(!before)throw new CatalogError(404,'CRM_USER_NOT_FOUND','Usuário não encontrado.');
       if(this.version(session.instance,before)!==body['version'])throw new CatalogError(409,'CRM_USER_CHANGED','O cadastro foi alterado. Recarregue para continuar.');
       const values:Row={};for(const [key,value] of Object.entries(changes))values[key]=this.value(schema.fields.find(field=>field.name===key)!,value);
+      const deactivating=requestsDeactivation(values);
+      if(deactivating)await assertNoPendingCrmAgenda(this.execute,session.instance,userId);
       const fields=schema.fields,cas=fields.map(field=>field.type==='number'?`${quote(field.name)} <=> ?`:`${binary(field.type==='date'?`CAST(${quote(field.name)} AS CHAR)`:quote(field.name))} <=> ${binary('?')}`).join(' AND ');
-      const result=await this.execute<{affectedRows:number}>(session.instance,`UPDATE operadores SET ${Object.keys(values).map(key=>quote(key)+'=?').join(',')} WHERE CODIGO=? AND ${cas}`,[...Object.values(values),userId,...fields.map(field=>before[field.name])]);
+      const result=await this.execute<{affectedRows:number}>(session.instance,`UPDATE operadores SET ${Object.keys(values).map(key=>quote(key)+'=?').join(',')} WHERE CODIGO=? AND ${cas}${deactivating?' AND '+noPendingCrmAgenda:''}`,[...Object.values(values),userId,...fields.map(field=>before[field.name]),...(deactivating?[userId]:[])]);
+      if(deactivating&&result?.affectedRows===0)await assertNoPendingCrmAgenda(this.execute,session.instance,userId);
       const after=await this.row(session.instance,schema,userId);if(!after)throw new CatalogError(404,'CRM_USER_NOT_FOUND','Usuário não encontrado.');
       const noop=Object.entries(values).every(([key,value])=>before[key]===value);
       if(result?.affectedRows!==1&&!(result?.affectedRows===0&&noop&&this.version(session.instance,after)===body['version']))throw new CatalogError(409,'CRM_USER_CHANGED','O cadastro foi alterado. Recarregue para continuar.');

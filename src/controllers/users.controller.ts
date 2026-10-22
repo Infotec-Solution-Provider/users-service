@@ -13,6 +13,8 @@ import {
 } from "../types/push-notification.type";
 import authService from "../services/auth.service";
 import registration from "../services/user-registration.service";
+import { CatalogError } from "../services/crm-catalogs/contract";
+import type { NextFunction } from "express";
 
 function publicUser<T>(value: T): T {
 	if (!value || typeof value !== "object") return value;
@@ -57,6 +59,10 @@ class UsersController {
 			this.removePushSubscription.bind(this),
 		);
 		this.router.post("/_internal/push-notifications", this.sendInternalPushNotification.bind(this));
+		this.router.use((error: unknown, _req: Request, res: Response, next: NextFunction) => {
+			if (!(error instanceof CatalogError)) return next(error);
+			return res.status(error.status).json({ code: error.code, message: error.message, ...(error.outcome ? { outcome: error.outcome } : {}) });
+		});
 	}
 
 	private assertCanManageUser(req: Request, userId: number): void {
