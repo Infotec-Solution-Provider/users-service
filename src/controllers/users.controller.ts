@@ -15,6 +15,7 @@ import authService from "../services/auth.service";
 import registration from "../services/user-registration.service";
 import { CatalogError } from "../services/crm-catalogs/contract";
 import type { NextFunction } from "express";
+import { requestsDeactivation } from "../services/user-deactivation.guard";
 
 function publicUser<T>(value: T): T {
 	if (!value || typeof value !== "object") return value;
@@ -115,7 +116,7 @@ class UsersController {
 		const userId = +req.params["userId"]!;
 
 		await usersService.update(instance, userId, req.body);
-		if (req.body?.SENHA !== undefined || req.body?.ATIVO === "NAO") {
+		if (req.body?.SENHA !== undefined || requestsDeactivation(req.body)) {
 			await authService.revokeUserSessions(instance, userId);
 		}
 
