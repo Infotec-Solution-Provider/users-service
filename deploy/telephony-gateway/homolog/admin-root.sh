@@ -6,10 +6,31 @@ test "$#" = 1
 SOURCE=/home/inpulse/htdocs/homolog/users-service/deploy/telephony-gateway/homolog
 STATE=/var/lib/homolog-telephony-install
 case "$1" in
+verify)
+    for unit in homolog-telephony-firewall homolog-telephony-rtpengine homolog-telephony-kamailio; do
+        systemctl is-active --quiet "$unit"
+        systemctl is-enabled --quiet "$unit"
+        echo "$unit: active, enabled"
+    done
+    python3 /usr/local/libexec/homolog-telephony-wait-media.py
+    iptables -w -C INPUT -j HOMOLOG_TELEPHONY
+    python3 - <<'PY'
+from pathlib import Path
+production = Path('/etc/nginx/sites-enabled/inpulse.infotecrs.inf.br.conf')
+archives = sorted(Path('/var/lib').glob('homolog-telephony-install-failed-*'))
+for archive in archives:
+    record = archive / 'vhost-path'
+    if record.exists() and record.read_text().strip() == str(production):
+        assert production.read_bytes() == (archive / 'nginx.before').read_bytes(), 'Production vhost differs from original backup'
+        print('production-vhost-restored=True')
+        break
+print('media-control-ready=True')
+PY
+    nginx -t
+    ;;
 inspect)
     python3 - <<'PY'
 from pathlib import Path
-import hashlib
 state = Path('/var/lib/homolog-telephony-install')
 for name in ('nginx.conf',):
     path = Path('/etc/nginx') / name
@@ -30,7 +51,7 @@ for vhost in Path('/etc/nginx/sites-enabled').glob('*homolog*'):
     for line in vhost.read_text().splitlines():
         if line.strip().startswith(('listen ', 'server_name ', 'include ')):
             print(line.strip())
-print('zones-exists=' + str(Path('/etc/nginx/conf.d/homolog-telephony-zones.conf').exists()))
+print('zones-exists=' + str(Path('/etc/nginx/sites-enabled/00-homolog-telephony-zones.conf').exists()))
 PY
     systemctl cat homolog-telephony-kamailio homolog-telephony-rtpengine
     ;;
