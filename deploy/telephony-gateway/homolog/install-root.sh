@@ -47,6 +47,9 @@ test -f "$VHOST"
 test -f "$SOURCE/kamailio.cfg"
 grep -q 'gatewayAvailable' "$H/users-service/dist/controllers/webrtc.controller.js"
 grep -q 'telephony/gateway/authorize' "$H/users-service/dist/controllers/webrtc.controller.js"
+CATALOG=$(runuser -u inpulse -- "$H/bin/hsql.sh" homolog-instances --batch --skip-column-names \
+    -e 'SELECT CONCAT(instance_name,":",host,":",port,":",`database`) FROM clients_servers ORDER BY instance_name')
+test "$CATALOG" = $'homolog:127.0.0.1:3306:homolog-crm\nsuprimaxxi:127.0.0.1:3306:homolog-crm-suprimaxxi'
 ip -4 addr show | grep -q "$PRIVATE/"
 ip -4 addr show | grep -q "$PUBLIC/"
 if ss -H -lntu | grep -Eq ':(5060|7170|7223)\b'; then echo 'Portas do gateway ocupadas.' >&2; exit 1; fi

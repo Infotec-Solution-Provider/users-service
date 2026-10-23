@@ -58,7 +58,8 @@ espera/retomada e renovação do registro. Não registre um ramal que esteja em 
 em outro aparelho: `chan_sip` normalmente guarda um único registro por ramal.
 
 Os testes de pacote em container cobrem sintaxe, inicialização sem root, controle
-de mídia NG, recusas de handshake e limites de edição/rollback. Não substituem
+de mídia NG, handshake autorizado, REGISTER/retorno SIP com central simulada,
+recusa de outro ramal/destino e limites de edição/rollback. Não substituem
 uma ligação real no servidor, nem demonstram capacidade concorrente. Redes do
 cliente que bloqueiam UDP podem exigir TURN, que não é instalado neste pacote.
 
