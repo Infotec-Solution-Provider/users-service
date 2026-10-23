@@ -23,6 +23,7 @@ commands = {
     'nginx': 'exit 0',
     'systemctl': 'if [ "$1" = is-active ]; then exit 3; fi; exit 0',
     'apt-get': 'echo "$1" >> /tmp/resume-apt-calls; echo APT_SIMULATED_FAILURE; exit 42',
+    'dpkg-query': 'exit 1',
 }
 for name, content in commands.items():
     path = binary / name

@@ -25,6 +25,7 @@ KAM=$!
 trap 'kill "$KAM" "$RTP" 2>/dev/null || true' EXIT
 sleep 3
 if ! kill -0 "$KAM" "$RTP"; then cat /tmp/kamailio.log /tmp/rtpengine.log; exit 1; fi
+python3 /source/homolog/wait-media.py
 python3 - <<'PY'
 import socket
 import http.client

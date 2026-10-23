@@ -48,6 +48,14 @@ Esse modo preserva os backups e logs originais e recusa prosseguir se o `.env`
 ou vhost tiver mudado, se as chaves já tiverem sido criadas ou se a ativação das
 unidades tiver começado. Não apague o diretório de estado para repetir `install`.
 
+Para repetir uma ativação **já revertida pelo rollback**, existe `recover`. Ele
+exige serviços inativos, configuração original restaurada e nenhuma instalação
+concluída; arquiva a tentativa anterior e só então prepara uma nova configuração.
+Não reinstala pacotes que já estejam presentes. As zonas nginx ficam em
+`/etc/nginx/sites-enabled/00-homolog-telephony-zones.conf`, pois o nginx deste
+CloudPanel não inclui `conf.d/*.conf`. A readiness do rtpengine é conferida antes
+de iniciar o Kamailio, inclusive após reinicialização do servidor.
+
 Após instalar, os administradores dos tenants de homologação podem selecionar o
 gateway na configuração SIP. Nenhum tenant nem ramal é modificado pelo instalador.
 Um mesmo gateway atende várias centrais e vários tenants; a conexão é vinculada ao

@@ -6,6 +6,29 @@ test "$#" = 1
 SOURCE=/home/inpulse/htdocs/homolog/users-service/deploy/telephony-gateway/homolog
 STATE=/var/lib/homolog-telephony-install
 case "$1" in
+inspect)
+    python3 - <<'PY'
+from pathlib import Path
+import hashlib
+state = Path('/var/lib/homolog-telephony-install')
+for name in ('nginx.conf',):
+    path = Path('/etc/nginx') / name
+    print('nginx-main-includes:')
+    for line in path.read_text().splitlines():
+        if line.strip().startswith(('include ', 'http ', 'http{')):
+            print(line.strip())
+target = Path((state / 'vhost-path').read_text().strip())
+print('vhost-path=' + str(target))
+print('vhost-matches-backup=' + str(target.read_bytes() == (state / 'nginx.before').read_bytes()))
+env = Path('/home/inpulse/htdocs/homolog/users-service/.env')
+print('users-env-matches-backup=' + str(env.read_bytes() == (state / 'users.env.before').read_bytes()))
+for line in target.read_text().splitlines():
+    if line.strip().startswith(('listen ', 'server_name ', 'include ')):
+        print(line.strip())
+print('zones-exists=' + str(Path('/etc/nginx/conf.d/homolog-telephony-zones.conf').exists()))
+PY
+    systemctl cat homolog-telephony-kamailio homolog-telephony-rtpengine
+    ;;
 diagnose)
     for unit in homolog-telephony-firewall homolog-telephony-rtpengine homolog-telephony-kamailio; do
         echo "unit=$unit"

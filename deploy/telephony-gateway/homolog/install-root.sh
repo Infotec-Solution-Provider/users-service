@@ -12,6 +12,7 @@ VHOST=${2:-/etc/nginx/sites-enabled/inpulse.infotecrs.inf.br.conf}
 PUBLIC=82.25.64.46
 PRIVATE=172.22.125.232
 NODE=/home/inpulse/.nvm/versions/node/v22.14.0/bin
+ZONES=/etc/nginx/sites-enabled/00-homolog-telephony-zones.conf
 pm2_homolog() {
     runuser -u inpulse -- env HOME=/home/inpulse PM2_HOME=/home/inpulse/.pm2 \
         PATH="$NODE:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" pm2 "$@"
@@ -47,7 +48,9 @@ rollback() {
             return 1
         fi
     fi
-    if test -f "$STATE/zones-created"; then rm -f /etc/nginx/conf.d/homolog-telephony-zones.conf; fi
+    if test -f "$STATE/zones-created"; then
+        rm -f "$ZONES" /etc/nginx/conf.d/homolog-telephony-zones.conf
+    fi
     nginx -t
     systemctl reload nginx
     systemctl disable --now homolog-telephony-firewall.service || true
@@ -55,7 +58,23 @@ rollback() {
     echo "Rollback concluído; pacotes e backups preservados em $STATE."
 }
 if [[ $MODE = rollback ]]; then rollback; exit; fi
-[[ $MODE = install || $MODE = resume ]] || { echo 'Uso: install-root.sh [install|resume|rollback] [vhost]' >&2; exit 2; }
+if [[ $MODE = recover ]]; then
+    test -f "$STATE/rolled-back"
+    test ! -f "$STATE/installed"
+    cmp -s "$H/users-service/.env" "$STATE/users.env.before"
+    cmp -s "$VHOST" "$STATE/nginx.before"
+    test ! -e "$ZONES"
+    for unit in homolog-telephony-firewall homolog-telephony-rtpengine homolog-telephony-kamailio; do
+        if systemctl is-active --quiet "$unit"; then echo "Unidade ainda ativa: $unit" >&2; exit 1; fi
+    done
+    ARCHIVE="$STATE-failed-$(date +%Y%m%dT%H%M%S)"
+    test ! -e "$ARCHIVE"
+    mv "$STATE" "$ARCHIVE"
+    if test -d "$C"; then cp -a "$C" "$ARCHIVE/gateway-config"; fi
+    echo "Tentativa anterior preservada em $ARCHIVE. Reconfigurando a homologação."
+    MODE=install
+fi
+[[ $MODE = install || $MODE = resume ]] || { echo 'Uso: install-root.sh [install|resume|recover|rollback] [vhost]' >&2; exit 2; }
 if [[ $MODE = resume ]]; then
     # Resume is deliberately restricted to failures before configuration/activation.
     test -f "$STATE/prepared"
@@ -89,6 +108,7 @@ if systemctl is-active --quiet kamailio || systemctl is-active --quiet rtpengine
     echo 'Outro gateway já está ativo; abortando.' >&2; exit 1
 fi
 test ! -e /etc/nginx/conf.d/homolog-telephony-zones.conf
+test ! -e "$ZONES"
 nginx -t
 if [[ $MODE = install ]]; then
     mkdir -p "$STATE"
@@ -107,9 +127,17 @@ fi
 # Apt must not start a distro-default SIP proxy on all interfaces.
 systemctl mask kamailio.service rtpengine.service rtpengine-daemon.service
 export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l
-package_step apt-update apt-get update
-package_step apt-install apt-get install -y --no-install-recommends kamailio kamailio-extra-modules \
-    kamailio-utils-modules kamailio-websocket-modules rtpengine-daemon iptables
+PACKAGES=(kamailio kamailio-extra-modules kamailio-utils-modules kamailio-websocket-modules rtpengine-daemon iptables)
+missing=0
+for package in "${PACKAGES[@]}"; do
+    if [[ $(dpkg-query -W -f='${db:Status-Status}' "$package" 2>/dev/null || true) != installed ]]; then missing=1; fi
+done
+if [[ $missing = 1 ]]; then
+    package_step apt-update apt-get update
+    package_step apt-install apt-get install -y --no-install-recommends "${PACKAGES[@]}"
+else
+    echo 'Pacotes necessários já instalados; sem repetir APT.'
+fi
 echo 'Pacotes instalados; configurando as unidades isoladas da homologação.'
 getent group homolog-telephony >/dev/null || groupadd --system homolog-telephony
 id homolog-telephony >/dev/null 2>&1 || useradd --system --gid homolog-telephony \
@@ -150,6 +178,8 @@ stop)
 esac
 FIREWALL
 chmod 750 /usr/local/sbin/homolog-telephony-firewall
+install -d -o root -g root -m 755 /usr/local/libexec
+install -o root -g root -m 644 "$SOURCE/homolog/wait-media.py" /usr/local/libexec/homolog-telephony-wait-media.py
 cat > /etc/systemd/system/homolog-telephony-firewall.service <<'UNIT'
 [Unit]
 Description=in.pulse homolog telephony UDP firewall
@@ -164,8 +194,12 @@ ExecStop=/usr/local/sbin/homolog-telephony-firewall stop
 WantedBy=multi-user.target
 UNIT
 for name in kamailio rtpengine; do
+    DEPENDENCY=''
+    PRESTART=''
     if [[ $name = kamailio ]]; then
         EXEC="/usr/sbin/kamailio -DD -E -m 64 -M 8 -P /run/homolog-telephony-kamailio/pid -f $C/kamailio.cfg"
+        DEPENDENCY='homolog-telephony-rtpengine.service'
+        PRESTART='ExecStartPre=/usr/bin/python3 /usr/local/libexec/homolog-telephony-wait-media.py'
     else
         EXEC="/usr/bin/rtpengine --config-file=$C/rtpengine.conf --foreground --log-stderr --pidfile=/run/homolog-telephony-rtpengine/pid"
     fi
@@ -173,8 +207,8 @@ for name in kamailio rtpengine; do
 [Unit]
 Description=in.pulse homolog telephony $name
 Wants=network-online.target
-After=network-online.target zerotier-one.service homolog-telephony-firewall.service
-Requires=homolog-telephony-firewall.service
+After=network-online.target zerotier-one.service homolog-telephony-firewall.service $DEPENDENCY
+Requires=homolog-telephony-firewall.service $DEPENDENCY
 StartLimitIntervalSec=300
 StartLimitBurst=5
 [Service]
@@ -183,6 +217,7 @@ User=homolog-telephony
 Group=homolog-telephony
 RuntimeDirectory=homolog-telephony-$name
 RuntimeDirectoryMode=0750
+$PRESTART
 ExecStart=$EXEC
 Restart=on-failure
 RestartSec=5
@@ -205,15 +240,9 @@ sleep 2
 systemctl is-active --quiet homolog-telephony-rtpengine.service
 systemctl is-active --quiet homolog-telephony-kamailio.service
 # Check the actual media-control socket, not only systemd's process state.
-python3 - <<'PY'
-import socket
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.settimeout(3)
-sock.sendto(b'install d7:command4:pinge', ('127.0.0.1', 7223))
-assert b'pong' in sock.recv(4096), 'rtpengine did not answer pong'
-PY
+python3 /usr/local/libexec/homolog-telephony-wait-media.py
 install -o root -g root -m 644 "$SOURCE/homolog/nginx.conf" "$C/nginx.conf"
-cat > /etc/nginx/conf.d/homolog-telephony-zones.conf <<'NGINX'
+cat > "$ZONES" <<'NGINX'
 limit_req_zone $binary_remote_addr zone=homolog_telephony_rate:1m rate=20r/m;
 limit_conn_zone $binary_remote_addr zone=homolog_telephony_connections:1m;
 NGINX
