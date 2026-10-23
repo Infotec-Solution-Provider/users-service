@@ -11,7 +11,7 @@ KEYS = (
     "TELEPHONY_GATEWAY_WSS_URL", "TELEPHONY_GATEWAY_TOKEN_SECRET",
     "TELEPHONY_GATEWAY_API_KEY", "TELEPHONY_GATEWAY_ALLOWED_NETWORKS",
 )
-ORIGIN = "https://inpulse.infotecrs.inf.br"
+ORIGIN = "https://homolog.infotecrs.inf.br"
 
 
 def replace_file(path, content):
@@ -91,13 +91,13 @@ def patch_nginx(target, snippet):
             continue
         block = text[start:end]
         names = re.findall(r"(?m)^\s*server_name\s+([^;]+);", block)
-        if not any("inpulse.infotecrs.inf.br" in line.split() for line in names):
+        if not any("homolog.infotecrs.inf.br" in line.split() for line in names):
             continue
         if not re.search(r"(?m)^\s*listen\s+[^;]*\b443\b[^;]*;", block):
             continue
         candidates.append(end)
     if len(candidates) != 1:
-        raise ValueError("Expected exactly one public HTTPS server for inpulse.infotecrs.inf.br")
+        raise ValueError("Expected exactly one public HTTPS server for homolog.infotecrs.inf.br")
     end = candidates[0]
     replace_file(target, text[:end] + "  " + marker + "\n" + text[end:])
 

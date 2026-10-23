@@ -41,17 +41,17 @@ response = sock.recv(4096)
 assert b'pong' in response, response
 def handshake(origin, token=''):
     conn = http.client.HTTPConnection('127.0.0.1', 7170, timeout=5)
-    conn.request('GET', '/homolog/telephony-gw?token=' + token, headers={
+    conn.request('GET', '/telephony-gw?token=' + token, headers={
         'Upgrade':'websocket', 'Connection':'Upgrade', 'Origin':origin,
         'Sec-WebSocket-Key':'dGhlIHNhbXBsZSBub25jZQ==', 'Sec-WebSocket-Version':'13', 'Sec-WebSocket-Protocol':'sip'})
     status = conn.getresponse().status
     conn.close()
     return status
-status = handshake('https://inpulse.infotecrs.inf.br')
+status = handshake('https://homolog.infotecrs.inf.br')
 assert status == 403, ('missing token', status)
 status = handshake('https://untrusted.invalid', 'x'*30)
 assert status == 403, ('foreign origin', status)
-status = handshake('https://inpulse.infotecrs.inf.br', 'x'*30)
+status = handshake('https://homolog.infotecrs.inf.br', 'x'*30)
 assert status == 403, ('unavailable authorizer', status)
 print('PASS: daemons as dedicated user, NG ping/pong, missing token, foreign origin, unavailable authorizer')
 # A loopback-only PBX and authorizer exercise a successful upgrade and SIP routing.
@@ -72,9 +72,9 @@ class Authorizer(http.server.BaseHTTPRequestHandler):
 server = http.server.HTTPServer(('127.0.0.1', 7101), Authorizer)
 threading.Thread(target=server.serve_forever, daemon=True).start()
 ws = socket.create_connection(('127.0.0.1', 7170), timeout=3)
-ws.sendall(('GET /homolog/telephony-gw?token=' + 'x'*30 + ' HTTP/1.1\r\n'
+ws.sendall(('GET /telephony-gw?token=' + 'x'*30 + ' HTTP/1.1\r\n'
     'Host: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n'
-    'Origin: https://inpulse.infotecrs.inf.br\r\nSec-WebSocket-Version: 13\r\n'
+    'Origin: https://homolog.infotecrs.inf.br\r\nSec-WebSocket-Version: 13\r\n'
     'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Protocol: sip\r\n\r\n').encode())
 assert b'101 Switching Protocols' in ws.recv(4096)
 def send_frame(payload):

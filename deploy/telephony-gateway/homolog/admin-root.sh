@@ -25,6 +25,11 @@ print('users-env-matches-backup=' + str(env.read_bytes() == (state / 'users.env.
 for line in target.read_text().splitlines():
     if line.strip().startswith(('listen ', 'server_name ', 'include ')):
         print(line.strip())
+for vhost in Path('/etc/nginx/sites-enabled').glob('*homolog*'):
+    print('homolog-vhost=' + str(vhost))
+    for line in vhost.read_text().splitlines():
+        if line.strip().startswith(('listen ', 'server_name ', 'include ')):
+            print(line.strip())
 print('zones-exists=' + str(Path('/etc/nginx/conf.d/homolog-telephony-zones.conf').exists()))
 PY
     systemctl cat homolog-telephony-kamailio homolog-telephony-rtpengine

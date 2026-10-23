@@ -7,7 +7,7 @@ import subprocess
 assert Path('/source/homolog/validate.Dockerfile').exists(), 'Disposable validation image required'
 home = Path('/home/inpulse/htdocs/homolog')
 state = Path('/var/lib/homolog-telephony-install')
-vhost = Path('/etc/nginx/sites-enabled/inpulse.infotecrs.inf.br.conf')
+vhost = Path('/etc/nginx/sites-enabled/homolog.infotecrs.inf.br.conf')
 assert not state.exists(), 'Refusing to overwrite an existing installation'
 (home / 'users-service/dist/controllers').mkdir(parents=True)
 (home / 'users-service/dist/controllers/webrtc.controller.js').write_text('gatewayAvailable telephony/gateway/authorize')

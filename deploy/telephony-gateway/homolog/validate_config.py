@@ -11,18 +11,18 @@ with tempfile.TemporaryDirectory() as folder:
     vhost = root / 'vhost.conf'
     before = '''server {
  listen 80;
- server_name inpulse.infotecrs.inf.br;
+ server_name homolog.infotecrs.inf.br;
  return 301 https://$host$request_uri;
 }
 server {
  listen 443 ssl;
  listen [::]:443 ssl;
- server_name inpulse.infotecrs.inf.br;
+ server_name homolog.infotecrs.inf.br;
  location / { proxy_pass http://127.0.0.1:3001; }
  # ignore misleading brace: }
  set $example "{quoted}";
 }
-server { listen 8080; server_name inpulse.infotecrs.inf.br; }
+server { listen 8080; server_name homolog.infotecrs.inf.br; }
 '''
     vhost.write_text(before)
     module.patch_nginx(vhost, '/etc/homolog-telephony/nginx.conf')

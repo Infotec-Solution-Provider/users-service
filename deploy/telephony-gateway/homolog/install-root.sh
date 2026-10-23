@@ -8,7 +8,7 @@ H=/home/inpulse/htdocs/homolog
 SOURCE=$(cd "$(dirname "$0")/.." && pwd)
 C=/etc/homolog-telephony
 STATE=/var/lib/homolog-telephony-install
-VHOST=${2:-/etc/nginx/sites-enabled/inpulse.infotecrs.inf.br.conf}
+VHOST=${2:-/etc/nginx/sites-enabled/homolog.infotecrs.inf.br.conf}
 PUBLIC=82.25.64.46
 PRIVATE=172.22.125.232
 NODE=/home/inpulse/.nvm/versions/node/v22.14.0/bin
@@ -54,6 +54,7 @@ rollback() {
     nginx -t
     systemctl reload nginx
     systemctl disable --now homolog-telephony-firewall.service || true
+    if test -f "$STATE/installed"; then mv "$STATE/installed" "$STATE/installed-before-rollback"; fi
     touch "$STATE/rolled-back"
     echo "Rollback concluído; pacotes e backups preservados em $STATE."
 }
@@ -62,7 +63,7 @@ if [[ $MODE = recover ]]; then
     test -f "$STATE/rolled-back"
     test ! -f "$STATE/installed"
     cmp -s "$H/users-service/.env" "$STATE/users.env.before"
-    cmp -s "$VHOST" "$STATE/nginx.before"
+    cmp -s "$(cat "$STATE/vhost-path")" "$STATE/nginx.before"
     test ! -e "$ZONES"
     for unit in homolog-telephony-firewall homolog-telephony-rtpengine homolog-telephony-kamailio; do
         if systemctl is-active --quiet "$unit"; then echo "Unidade ainda ativa: $unit" >&2; exit 1; fi
@@ -144,7 +145,7 @@ id homolog-telephony >/dev/null 2>&1 || useradd --system --gid homolog-telephony
     --home-dir /nonexistent --shell /usr/sbin/nologin homolog-telephony
 install -d -o root -g homolog-telephony -m 750 "$C"
 {
-    echo 'TELEPHONY_GATEWAY_WSS_URL=wss://inpulse.infotecrs.inf.br/homolog/telephony-gw'
+    echo 'TELEPHONY_GATEWAY_WSS_URL=wss://homolog.infotecrs.inf.br/telephony-gw'
     printf 'TELEPHONY_GATEWAY_TOKEN_SECRET=%s\n' "$(openssl rand -hex 32)"
     printf 'TELEPHONY_GATEWAY_API_KEY=%s\n' "$(openssl rand -hex 32)"
     echo 'TELEPHONY_GATEWAY_ALLOWED_NETWORKS=172.22.0.0/16'
@@ -260,10 +261,10 @@ pm2_homolog pid homolog-users | grep -Eq '^[1-9][0-9]*$'
 # Verify the public route and TLS without sending a real token or registering a SIP extension.
 python3 - <<'PY'
 import http.client
-conn = http.client.HTTPSConnection('inpulse.infotecrs.inf.br', timeout=10)
-conn.request('GET', '/homolog/telephony-gw', headers={
+conn = http.client.HTTPSConnection('homolog.infotecrs.inf.br', timeout=10)
+conn.request('GET', '/telephony-gw', headers={
     'Upgrade': 'websocket', 'Connection': 'Upgrade',
-    'Origin': 'https://inpulse.infotecrs.inf.br',
+    'Origin': 'https://homolog.infotecrs.inf.br',
     'Sec-WebSocket-Version': '13', 'Sec-WebSocket-Key': 'dGhlIHNhbXBsZSBub25jZQ==',
     'Sec-WebSocket-Protocol': 'sip',
 })

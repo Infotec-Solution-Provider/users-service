@@ -6,8 +6,8 @@ branch `homolog` inclui o protocolo de autorização. Não altera o código da p
 
 | Item | Configuração |
 |---|---|
-| WSS público | `wss://inpulse.infotecrs.inf.br/homolog/telephony-gw` |
-| Origem permitida | `https://inpulse.infotecrs.inf.br` |
+| WSS público | `wss://homolog.infotecrs.inf.br/telephony-gw` |
+| Origem permitida | `https://homolog.infotecrs.inf.br` |
 | WebSocket interno | `127.0.0.1:7170/TCP` |
 | Autorização | `http://127.0.0.1:7101/api/telephony/gateway/authorize` |
 | SIP privado | `172.22.125.232:5060/UDP` |
