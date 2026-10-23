@@ -37,6 +37,17 @@ servidor e nunca fazem parte do pacote. As demais configurações de `users-serv
 são preservadas. As unidades padrão dos pacotes ficam mascaradas, para não iniciar
 um proxy SIP padrão nas interfaces públicas.
 
+Se a atualização/instalação de pacotes for interrompida, o instalador mostra as
+últimas linhas do erro. Para retomar **somente antes da configuração/ativação**:
+
+```bash
+sudo bash /caminho/do/pacote/homolog/install-root.sh resume
+```
+
+Esse modo preserva os backups e logs originais e recusa prosseguir se o `.env`
+ou vhost tiver mudado, se as chaves já tiverem sido criadas ou se a ativação das
+unidades tiver começado. Não apague o diretório de estado para repetir `install`.
+
 Após instalar, os administradores dos tenants de homologação podem selecionar o
 gateway na configuração SIP. Nenhum tenant nem ramal é modificado pelo instalador.
 Um mesmo gateway atende várias centrais e vários tenants; a conexão é vinculada ao

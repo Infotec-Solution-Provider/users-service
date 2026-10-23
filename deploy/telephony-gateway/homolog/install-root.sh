@@ -16,6 +16,21 @@ pm2_homolog() {
     runuser -u inpulse -- env HOME=/home/inpulse PM2_HOME=/home/inpulse/.pm2 \
         PATH="$NODE:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" pm2 "$@"
 }
+package_step() {
+    local name=$1 rc
+    shift
+    echo "Etapa: $name (aguarde; log em $STATE/$name.log)"
+    # Package-manager logs contain no gateway credentials. Show failures explicitly.
+    if "$@" > "$STATE/$name.log" 2>&1; then
+        tail -n 3 "$STATE/$name.log"
+    else
+        rc=$?
+        echo "Falha em $name (status $rc). Nenhum serviço do gateway foi ativado." >&2
+        tail -n 50 "$STATE/$name.log" >&2
+        echo 'Após corrigir a causa, execute este instalador com o argumento resume.' >&2
+        exit "$rc"
+    fi
+}
 rollback() {
     test -f "$STATE/prepared"
     systemctl disable --now homolog-telephony-kamailio.service homolog-telephony-rtpengine.service || true
@@ -40,8 +55,25 @@ rollback() {
     echo "Rollback concluído; pacotes e backups preservados em $STATE."
 }
 if [[ $MODE = rollback ]]; then rollback; exit; fi
-[[ $MODE = install ]] || { echo 'Uso: install-root.sh [install|rollback] [vhost]' >&2; exit 2; }
-test ! -e "$STATE/prepared"
+[[ $MODE = install || $MODE = resume ]] || { echo 'Uso: install-root.sh [install|resume|rollback] [vhost]' >&2; exit 2; }
+if [[ $MODE = resume ]]; then
+    # Resume is deliberately restricted to failures before configuration/activation.
+    test -f "$STATE/prepared"
+    test ! -e "$STATE/users-env-changed"
+    test ! -e "$STATE/nginx-installed.sha256"
+    test ! -e "$STATE/zones-created"
+    test ! -e "$C/users-gateway.env"
+    test ! -e /etc/systemd/system/homolog-telephony-kamailio.service
+    test ! -e /etc/systemd/system/homolog-telephony-rtpengine.service
+    cmp -s "$H/users-service/.env" "$STATE/users.env.before"
+    cmp -s "$VHOST" "$STATE/nginx.before"
+    echo 'Retomando instalação antes da ativação; backup original preservado.'
+else
+    if test -e "$STATE/prepared"; then
+        echo 'Já existe uma tentativa preparada. Use resume para falha nos pacotes, ou rollback.' >&2
+        exit 1
+    fi
+fi
 test -f "$H/users-service/.env"
 test -f "$VHOST"
 test -f "$SOURCE/kamailio.cfg"
@@ -58,20 +90,27 @@ if systemctl is-active --quiet kamailio || systemctl is-active --quiet rtpengine
 fi
 test ! -e /etc/nginx/conf.d/homolog-telephony-zones.conf
 nginx -t
-mkdir -p "$STATE"
-chmod 700 "$STATE"
-readlink -f "$VHOST" > "$STATE/vhost-path"
-cp -p "$VHOST" "$STATE/nginx.before"
-cp -p "$H/users-service/.env" "$STATE/users.env.before"
-chmod 600 "$STATE/users.env.before" "$STATE/nginx.before"
-touch "$STATE/prepared"
+if [[ $MODE = install ]]; then
+    mkdir -p "$STATE"
+    chmod 700 "$STATE"
+    readlink -f "$VHOST" > "$STATE/vhost-path"
+    cp -p "$VHOST" "$STATE/nginx.before"
+    cp -p "$H/users-service/.env" "$STATE/users.env.before"
+    chmod 600 "$STATE/users.env.before" "$STATE/nginx.before"
+    touch "$STATE/prepared"
+else
+    # Preserve logs from the interrupted attempt as well as the original backups.
+    for name in apt-update apt-install; do
+        if test -f "$STATE/$name.log"; then cp -p "$STATE/$name.log" "$STATE/$name-$(date +%s).log"; fi
+    done
+fi
 # Apt must not start a distro-default SIP proxy on all interfaces.
 systemctl mask kamailio.service rtpengine.service rtpengine-daemon.service
 export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l
-apt-get update > "$STATE/apt-update.log" 2>&1
-apt-get install -y --no-install-recommends kamailio kamailio-extra-modules \
-    kamailio-utils-modules kamailio-websocket-modules rtpengine-daemon iptables \
-    > "$STATE/apt-install.log" 2>&1
+package_step apt-update apt-get update
+package_step apt-install apt-get install -y --no-install-recommends kamailio kamailio-extra-modules \
+    kamailio-utils-modules kamailio-websocket-modules rtpengine-daemon iptables
+echo 'Pacotes instalados; configurando as unidades isoladas da homologação.'
 getent group homolog-telephony >/dev/null || groupadd --system homolog-telephony
 id homolog-telephony >/dev/null 2>&1 || useradd --system --gid homolog-telephony \
     --home-dir /nonexistent --shell /usr/sbin/nologin homolog-telephony
