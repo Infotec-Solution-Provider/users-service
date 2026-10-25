@@ -18,7 +18,7 @@ describe("CRM catalog SQL boundaries", () => {
   it("creates an explicit code in a single INSERT and does not query MAX or retry", async () => {
     execute.mockResolvedValueOnce({ affectedRows: 1 }).mockResolvedValueOnce([{ CODIGO: 52, DESCRICAO: "Grupo" }]);
     expect(await service.create(session, "user-groups", { CODIGO: 52, DESCRICAO: "Grupo" })).toEqual({ CODIGO: 52, DESCRICAO: "Grupo" });
-    expect(execute.mock.calls[0]).toEqual(["tenant-a", "INSERT INTO `grupos_operador` (`CODIGO`,`DESCRICAO`) VALUES (?,?)", [52, "Grupo"]]);
+    expect(execute.mock.calls[0]).toEqual(["tenant-a", "INSERT INTO `grupos_operador` (`CODIGO`,`DESCRICAO`) SELECT ?,? FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM `grupos_operador` WHERE DESCRICAO=?)", [52, "Grupo", "Grupo"]]);
     expect(execute.mock.calls.some(call => String(call[1]).includes("MAX("))).toBe(false);
   });
   it("reports a lost write as UNKNOWN without leaking or retrying SQL", async () => {

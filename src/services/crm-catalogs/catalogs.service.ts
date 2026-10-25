@@ -64,7 +64,8 @@ export class CrmCatalogsService {
     admin(session); const spec = definition(name), data = create(input, spec); object(query, []);
     return this.safe(async () => {
       const fields = Object.keys(data), code = Number(data["CODIGO"]);
-      const result = await this.execute<{ affectedRows: number }>(session.instance, `INSERT INTO \`${spec.table}\` (${fields.map(key => `\`${key}\``).join(",")}) VALUES (${fields.map(() => "?").join(",")})`, Object.values(data));
+      const result = await this.execute<{ affectedRows: number }>(session.instance, `INSERT INTO \`${spec.table}\` (${fields.map(key => `\`${key}\``).join(",")}) SELECT ${fields.map(() => "?").join(",")} FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM \`${spec.table}\` WHERE DESCRICAO=?)`, [...Object.values(data), data["DESCRICAO"]]);
+      if (result?.affectedRows === 0) throw new CatalogError(409, "CRM_CATALOG_DUPLICATE_DESCRIPTION", "Já existe um cadastro com esta descrição.");
       if (acknowledged(result) !== 1) throw new Error("Invalid insert");
       this.observe(session, `${name}.create`, code, fields);
       const row = await this.row(session.instance, spec, code); if (!row) throw new Error("Created row unavailable"); return row;
