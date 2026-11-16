@@ -32,9 +32,11 @@ export function operatorFeatures(principal: FeaturePrincipal, readPolicy: () => 
   if (instance !== "odim") return { managed: false as const, instance, operatorId: principal.userId, features: { operator: null, telephony: null, crm: null, whatsapp: null }, revision: null };
   if (!Number.isSafeInteger(principal.userId) || principal.userId < 1) throw new OperatorFeatureError("OPERATOR_FEATURE_POLICY_UNAVAILABLE", 503);
   const policy = readPolicy(), allowed = policy.allowedOperatorIds.includes(principal.userId);
-  return { managed: true as const, instance, operatorId: principal.userId, features: { operator: allowed && policy.features.operator, telephony: allowed && policy.features.telephony, crm: allowed && policy.features.crm, whatsapp: allowed && policy.features.whatsapp }, revision: policy.revision };
+  return { managed: true as const, instance, operatorId: principal.userId, features: { operator: allowed && policy.features.operator, telephony: allowed && policy.features.telephony, crm: allowed && policy.features.crm, whatsapp: true }, revision: policy.revision };
 }
 export function assertOperatorFeature(principal: FeaturePrincipal, feature: OperatorFeature, readPolicy?: () => FeaturePolicy): void {
+  // Existing WhatsApp operations are outside the new telephony pilot.
+  if (feature === "whatsapp") return;
   const access = operatorFeatures(principal, readPolicy);
   if (access.managed && !access.features[feature]) throw new OperatorFeatureError();
 }
