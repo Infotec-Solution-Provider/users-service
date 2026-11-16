@@ -4,6 +4,7 @@ import isAdmin from "../middlewares/is-admin.middleware";
 import usersService from "../services/users.service";
 import { buildWebrtcConfig } from "../services/webrtc-config";
 import webrtcSettingsService from "../services/webrtc-settings.service";
+import { assertOperatorFeature, OperatorFeatureError } from "../operator-features/rollout";
 
 const router = Router();
 
@@ -11,6 +12,12 @@ router.get("/telephony/webrtc-config", isAuthenticated, async (req, res) => {
   // Identity is exclusively from the authenticated session, never query/body/path.
   res.setHeader("Cache-Control", "no-store, private");
   res.setHeader("Pragma", "no-cache");
+  try { assertOperatorFeature(req.session, "telephony"); }
+  catch (error) {
+    if (!(error instanceof OperatorFeatureError)) throw error;
+    res.status(error.status).json({ code: error.code, outcome: error.outcome, message: error.message });
+    return;
+  }
   const config = await webrtcSettingsService.getEnabled(req.session.instance);
   const sip = await usersService.getSipConfigByOperator(req.session.instance, req.session.userId);
   res.status(200).json({ data: buildWebrtcConfig(config, sip) });
