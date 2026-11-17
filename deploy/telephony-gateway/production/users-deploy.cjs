@@ -1,0 +1,39 @@
+'use strict';
+// Fixed users-only overlay. Preserves every other deployed JS file, rollout, package and environment.
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),cp=require('node:child_process'),assert=require('node:assert/strict'),os=require('node:os');
+const ROOT='/home/inpulse/odim-telephony-gateway-20261117',LIVE='/home/inpulse/htdocs/inpulse.infotecrs.inf.br/users-service',PM2='/home/inpulse/.nvm/versions/node/v22.14.0/bin/pm2';
+const FIELDS=['dist/controllers/webrtc.controller.js','dist/services/telephony-gateway.js','dist/services/webrtc-config.js','dist/services/webrtc-settings.service.js','telephony-gateway.config.json'];
+const APPS=['instances','customers','users','frontend','whatsapp','odim-modern-frontend','odim-copy','files','socket','reports','marketing','ai','reports-frontend','landing-page'];
+const sha=b=>crypto.createHash('sha256').update(b).digest('hex'),hash=f=>sha(fs.readFileSync(f));
+function regular(f){const s=fs.lstatSync(f);assert(s.isFile()&&!s.isSymbolicLink(),'REGULAR_FILE_REQUIRED');return s;}
+function metadata(root){const entries=[];for(const prefix of['','dist/'])for(const name of fs.readdirSync(root+'/'+prefix))if(name==='.env'||name.startsWith('.env.')){const f=root+'/'+prefix+name;regular(f);const s=fs.lstatSync(f,{bigint:true});entries.push([prefix+name,[s.dev,s.ino,s.size,s.mtimeNs,s.ctimeNs].map(String)]);}return Object.fromEntries(entries.sort(([a],[b])=>a.localeCompare(b)));}
+function inventory(root){const result={};function walk(dir){for(const entry of fs.readdirSync(dir,{withFileTypes:true})){assert(!entry.isSymbolicLink(),'DIST_SYMLINK');const f=dir+'/'+entry.name;if(entry.isDirectory())walk(f);else if(entry.isFile()&&entry.name.endsWith('.js'))result[path.relative(root,f).replaceAll('\\','/')]=hash(f);}}walk(root+'/dist');return result;}
+function pids(){return Object.fromEntries(APPS.map(name=>[name,cp.execFileSync(PM2,['pid',name],{encoding:'utf8',timeout:10000}).trim()]));}
+function write(file,value){const temp=file+'.tmp';assert(!fs.existsSync(temp));const fd=fs.openSync(temp,'wx',0o600);try{fs.writeFileSync(fd,JSON.stringify(value,null,2));fs.fsyncSync(fd);}finally{fs.closeSync(fd);}fs.renameSync(temp,file);}
+function createDeploy(manifest,options={}){
+ const root=options.root||ROOT,live=options.live||LIVE,stateFile=root+'/users-receipt.json',snapshot=options.snapshot||pids;
+ const owner=options.owner||(()=>{assert.equal(process.platform,'linux');assert.equal(process.getuid(),1003);assert.equal(os.hostname().split('.')[0],'srv733293');});
+ const command=options.command||(action=>cp.execFileSync(PM2,[action,'users','--kill-timeout','15000'],{stdio:'pipe',timeout:60000}));
+ const health=options.health||(async()=>{for(let i=0;i<20;i++){try{const response=await fetch('http://127.0.0.1:8001/api/telephony/webrtc-settings',{signal:AbortSignal.timeout(1500)});if(response.body)await response.body.cancel();if(response.status===401)return 401;}catch{}await new Promise(r=>setTimeout(r,500));}throw Error('USERS_HEALTH_FAILED');});
+ function guard(installed=false){owner();assert.equal(manifest.version,1);assert.equal(manifest.live,live);assert.deepEqual(Object.keys(manifest.files).sort(),[...FIELDS].sort());assert.equal(manifest.allowedOperatorId,534);assert.equal(manifest.instance,'odim');
+  for(const dir of[root,live]){const s=fs.lstatSync(dir);assert(s.isDirectory()&&!s.isSymbolicLink());}
+  for(const[n,h]of Object.entries(manifest.config)){assert(['package.json','package-lock.json','tsconfig.json'].includes(n));assert.equal(hash(live+'/'+n),h,'PACKAGE_DRIFT');}
+  assert.deepEqual(metadata(live),manifest.environmentMetadata,'ENVIRONMENT_METADATA_DRIFT');assert.equal(hash(live+'/operator-feature-rollout.json'),manifest.rolloutProfileSha256,'ROLLOUT_DRIFT');
+  const expected={...manifest.before};if(installed)for(const[n,h]of Object.entries(manifest.files))if(n.startsWith('dist/'))expected[n]=h;
+  assert.deepEqual(inventory(live),expected,'LIVE_JS_INVENTORY_DRIFT');
+  const file=live+'/telephony-gateway.config.json';if(installed){regular(file);assert.equal(hash(file),manifest.files['telephony-gateway.config.json']);if(process.platform!=='win32')assert.equal(fs.statSync(file).mode&0o777,0o600);}else assert(!fs.existsSync(file),'GATEWAY_CONFIG_ALREADY_EXISTS');
+ }
+ function source(name){return name==='telephony-gateway.config.json'?root+'/private/gateway.json':root+'/staging/users/'+name;}
+ function plan(){guard();assert(!fs.existsSync(stateFile),'DEPLOYMENT_ALREADY_STARTED');for(const[n,h]of Object.entries(manifest.files)){regular(source(n));assert.equal(hash(source(n)),h,'STAGING_DRIFT');}return{prepared:true,changedJs:4,privateConfig:true,otherServiceRestarts:0};}
+ async function restore(state){guardInstalledOwned();command('stop');for(const name of FIELDS){const target=live+'/'+name;if(Object.hasOwn(manifest.before,name))fs.copyFileSync(root+'/backups/'+name,target);else if(fs.existsSync(target))fs.unlinkSync(target);}command('restart');state.rollbackHealth=await health();state.phase='rolled-back';write(stateFile,state);guard();return{rolledBack:true};}
+ function guardInstalledOwned(){for(const name of FIELDS){const f=live+'/'+name;if(fs.existsSync(f)){regular(f);assert([manifest.files[name],manifest.before[name]].includes(hash(f)),'CONCURRENT_CHANGE_PREVENTS_ROLLBACK');}}assert.deepEqual(metadata(live),manifest.environmentMetadata);assert.equal(hash(live+'/operator-feature-rollout.json'),manifest.rolloutProfileSha256);}
+ async function install(){plan();for(const name of FIELDS)if(Object.hasOwn(manifest.before,name)){const f=root+'/backups/'+name;fs.mkdirSync(path.dirname(f),{recursive:true,mode:0o700});fs.copyFileSync(live+'/'+name,f,fs.constants.COPYFILE_EXCL);assert.equal(hash(f),manifest.before[name]);}
+  const state={phase:'prepared',atUtc:new Date().toISOString(),manifestSha256:sha(JSON.stringify(manifest)),beforePids:snapshot(),stopped:false};write(stateFile,state);
+  try{guard();state.stopped=true;write(stateFile,state);command('stop');for(const name of FIELDS){const target=live+'/'+name,temp=target+'.odim-gateway-release';assert(!fs.existsSync(temp));fs.copyFileSync(source(name),temp,fs.constants.COPYFILE_EXCL);fs.chmodSync(temp,name==='telephony-gateway.config.json'?0o600:0o644);assert.equal(hash(temp),manifest.files[name]);fs.renameSync(temp,target);}command('restart');state.health=await health();guard(true);state.phase='installed';state.completedAtUtc=new Date().toISOString();state.afterPids=snapshot();state.nonTargetPidsUnchanged=APPS.filter(n=>n!=='users').every(n=>state.beforePids[n]===state.afterPids[n]);write(stateFile,state);return{installed:true,health:state.health,nonTargetPidsUnchanged:state.nonTargetPidsUnchanged,otherServiceRestarts:0};}
+  catch(error){if(state.stopped){try{await restore(state);}catch{state.phase='rollback-needs-review';write(stateFile,state);}}throw error;}
+ }
+ async function verify(){guard(true);const state=JSON.parse(fs.readFileSync(stateFile));assert.equal(state.phase,'installed');assert.equal(state.manifestSha256,sha(JSON.stringify(manifest)));const result={verified:true,atUtc:new Date().toISOString(),health:await health(),usersPid:snapshot().users,privateConfig:true,rolloutPreserved:true,environmentMetadataPreserved:true};write(root+'/users-verification.json',result);return result;}
+ return{plan,install,verify,rollback:()=>restore(JSON.parse(fs.readFileSync(stateFile)))};
+}
+module.exports={createDeploy,metadata,inventory,FIELDS};
+if(require.main===module){(async()=>{assert(['plan','install','verify','rollback'].includes(process.argv[2]));const manifest=JSON.parse(fs.readFileSync(ROOT+'/users-release.json'));console.log(JSON.stringify(await createDeploy(manifest)[process.argv[2]]()));})().catch(error=>{const code=/^[A-Z_]+$/.test(String(error.message))?error.message:error.code||error.name;console.error(JSON.stringify({ok:false,code}));process.exitCode=1;});}

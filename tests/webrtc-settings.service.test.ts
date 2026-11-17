@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ executeQuery: vi.fn() }));
 vi.mock("../src/services/instances.service", () => ({ default: mocks }));
 import service from "../src/services/webrtc-settings.service";
-const settings = { enabled: true, websocketUrl: "wss://pbx.example.test/ws", domain: "pbx.example.test", iceServers: [{ urls: ["turn:relay.test:3478"], username: "user", credential: "test-only" }] };
+const settings = { enabled: true, mode: "direct", pbxAddress: "", websocketUrl: "wss://pbx.example.test/ws", domain: "pbx.example.test", iceServers: [{ urls: ["turn:relay.test:3478"], username: "user", credential: "test-only" }] };
 afterEach(() => { vi.resetAllMocks(); vi.unstubAllEnvs(); });
 describe("tenant database WebRTC settings", () => {
   it("defaults to disabled without falling back to environment configuration or creating tables", async () => {
